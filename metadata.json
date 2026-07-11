@@ -1,0 +1,6 @@
+{
+  "name": "VelvetCycle",
+  "description": "VelvetCycle is a premium period tracker designed for women with a customizable, fully functional cycle prediction engine, elegant calendars, and interactive phase analysis.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
