@@ -31,6 +31,14 @@ import com.example.utils.StorageHelper
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
+import com.example.constants.PhaseGuide
+import com.example.constants.PhaseGuideData
+import androidx.compose.material.icons.outlined.LightMode
+import androidx.compose.material.icons.outlined.WbSunny
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.FitnessCenter
+import androidx.compose.material.icons.outlined.Restaurant
+
 @Composable
 fun HomeScreen(
     storageHelper: StorageHelper
@@ -70,6 +78,9 @@ fun HomeScreen(
         "luteal" -> "Progesterone dominates. It is time to wind down and practice self-care."
         else -> ""
     }
+
+    // Get current Phase Guide data
+    val guide = PhaseGuide.getGuide(currentPhase)
 
     Column(
         modifier = Modifier
@@ -402,6 +413,173 @@ fun HomeScreen(
                         }
                     }
                 }
+            }
+        }
+
+        // --- Card 5 — Today's Guide ---
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .testTag("todays_guide_card"),
+            colors = CardDefaults.cardColors(containerColor = White),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(20.dp)
+            ) {
+                // Title
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Info,
+                        contentDescription = "Today's Guide",
+                        tint = PrimaryPink,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Text(
+                        text = "Today's Guide",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PrimaryPink
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // SECTION 1: Body info
+                Text(
+                    text = "BODY AWARENESS",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = PrimaryPink.copy(alpha = 0.8f),
+                    letterSpacing = 1.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = guide.body,
+                    fontSize = 14.sp,
+                    color = DarkText,
+                    lineHeight = 20.sp
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Divider(color = LightPinkBg, thickness = 1.dp)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // SECTION 2: Nutrition Guide
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.Restaurant,
+                        contentDescription = "Nutrition",
+                        tint = PrimaryPink,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "NUTRITION PLAN",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PrimaryPink.copy(alpha = 0.8f),
+                        letterSpacing = 1.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Morning
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.LightMode,
+                        contentDescription = "Morning",
+                        tint = Teal,
+                        modifier = Modifier.size(16.dp).padding(top = 2.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("Morning", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                        Text(guide.foodMorning, fontSize = 13.sp, color = DarkText.copy(alpha = 0.7f), lineHeight = 18.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Afternoon
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.WbSunny,
+                        contentDescription = "Afternoon",
+                        tint = Teal,
+                        modifier = Modifier.size(16.dp).padding(top = 2.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("Afternoon", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                        Text(guide.foodAfternoon, fontSize = 13.sp, color = DarkText.copy(alpha = 0.7f), lineHeight = 18.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // Evening
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.DarkMode,
+                        contentDescription = "Evening",
+                        tint = Teal,
+                        modifier = Modifier.size(16.dp).padding(top = 2.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text("Evening", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = DarkText)
+                        Text(guide.foodEvening, fontSize = 13.sp, color = DarkText.copy(alpha = 0.7f), lineHeight = 18.sp)
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                Divider(color = LightPinkBg, thickness = 1.dp)
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // SECTION 3: Exercise Guide
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.FitnessCenter,
+                        contentDescription = "Exercise",
+                        tint = PrimaryPink,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = "WORKOUT ADVICE",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = PrimaryPink.copy(alpha = 0.8f),
+                        letterSpacing = 1.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = guide.exercise,
+                    fontSize = 13.sp,
+                    color = DarkText.copy(alpha = 0.7f),
+                    lineHeight = 18.sp
+                )
             }
         }
     }

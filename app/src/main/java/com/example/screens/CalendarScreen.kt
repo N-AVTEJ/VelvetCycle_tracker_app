@@ -8,6 +8,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
@@ -29,6 +31,7 @@ import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun CalendarScreen(
     storageHelper: StorageHelper
@@ -56,6 +59,7 @@ fun CalendarScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(LightPinkBg)
+            .verticalScroll(rememberScrollState())
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -241,6 +245,8 @@ fun CalendarScreen(
                 else -> "Low chances of conception. Normal cycle day."
             }
 
+            val log = storageHelper.getLog(date.toString())
+
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -293,6 +299,104 @@ fun CalendarScreen(
                         fontSize = 13.sp,
                         color = DarkText.copy(alpha = 0.7f)
                     )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Divider(color = LightPinkBg, thickness = 1.dp)
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    if (log != null) {
+                        Text(
+                            text = "Daily Log",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = PrimaryPink,
+                            modifier = Modifier.padding(bottom = 12.dp)
+                        )
+                        
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (log.mood.isNotEmpty()) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(LightPinkBg)
+                                        .padding(10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(log.mood, fontSize = 28.sp)
+                                }
+                            }
+                            
+                            Column {
+                                Text(
+                                    text = "Flow Intensity",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GrayText
+                                )
+                                Text(
+                                    text = log.flow.ifEmpty { "None" },
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = DarkText
+                                )
+                            }
+                        }
+                        
+                        if (log.symptoms.isNotEmpty()) {
+                            Text(
+                                text = "Symptoms",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GrayText,
+                                modifier = Modifier.padding(bottom = 6.dp)
+                            )
+                            FlowRow(
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                log.symptoms.forEach { symptom ->
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .background(PrimaryPink.copy(alpha = 0.08f))
+                                            .border(1.dp, PrimaryPink.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Text(symptom, fontSize = 11.sp, color = PrimaryPink, fontWeight = FontWeight.Medium)
+                                    }
+                                }
+                            }
+                        }
+                        
+                        if (log.notes.isNotEmpty()) {
+                            Text(
+                                text = "Notes",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = GrayText,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                            Text(
+                                text = log.notes,
+                                fontSize = 13.sp,
+                                color = DarkText.copy(alpha = 0.8f),
+                                lineHeight = 18.sp
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "No log for this day.",
+                            fontSize = 13.sp,
+                            color = GrayText,
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.testTag("no_log_text")
+                        )
+                    }
                 }
             }
         }

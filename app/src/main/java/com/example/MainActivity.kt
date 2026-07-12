@@ -147,7 +147,7 @@ fun MainAppLayout(storageHelper: StorageHelper) {
                 CalendarScreen(storageHelper = storageHelper)
             }
             composable("log") {
-                LogScreen()
+                LogScreen(storageHelper = storageHelper)
             }
             composable("insights") {
                 InsightsScreen()
