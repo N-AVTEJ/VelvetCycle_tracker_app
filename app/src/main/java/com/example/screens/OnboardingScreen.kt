@@ -349,6 +349,9 @@ fun OnboardingScreen(
                             storageHelper.cycleLength = cycleLength
                             storageHelper.isOnboarded = true
                             
+                            // Schedule push notifications on onboarding completion
+                            com.example.utils.NotificationHelper.scheduleAllNotifications(context, storageHelper)
+                            
                             onOnboardingFinished()
                         }
                     },

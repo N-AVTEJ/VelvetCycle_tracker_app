@@ -10,14 +10,14 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.outlined.BarChart
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -26,6 +26,9 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -37,7 +40,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.screens.CalendarScreen
 import com.example.screens.HomeScreen
-import com.example.screens.InsightsScreen
+import com.example.screens.SettingsScreen
 import com.example.screens.LogScreen
 import com.example.screens.OnboardingScreen
 import com.example.ui.theme.DarkText
@@ -46,16 +49,31 @@ import com.example.ui.theme.PrimaryPink
 import com.example.ui.theme.White
 import com.example.utils.StorageHelper
 
-class MainActivity : ComponentActivity() {
+class MainActivity : androidx.fragment.app.FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
         val storageHelper = StorageHelper(this)
+        if (storageHelper.isOnboarded) {
+            com.example.utils.NotificationHelper.scheduleAllNotifications(this, storageHelper)
+        }
         
         setContent {
             MyApplicationTheme {
-                MainAppLayout(storageHelper)
+                var isUnlocked by remember { 
+                    mutableStateOf(storageHelper.userPin == null) 
+                }
+                
+                if (!isUnlocked) {
+                    com.example.screens.PinScreen(
+                        storageHelper = storageHelper,
+                        initialMode = com.example.screens.PinMode.Verify,
+                        onUnlocked = { isUnlocked = true }
+                    )
+                } else {
+                    MainAppLayout(storageHelper)
+                }
             }
         }
     }
@@ -85,7 +103,7 @@ fun MainAppLayout(storageHelper: StorageHelper) {
                         TabItem("home", "Home", Icons.Filled.Home, Icons.Outlined.Home),
                         TabItem("calendar", "Calendar", Icons.Filled.CalendarMonth, Icons.Outlined.CalendarMonth),
                         TabItem("log", "Log", Icons.Filled.Edit, Icons.Outlined.Edit),
-                        TabItem("insights", "Insights", Icons.Filled.BarChart, Icons.Outlined.BarChart)
+                        TabItem("settings", "Settings", Icons.Filled.Settings, Icons.Outlined.Settings)
                     )
                     
                     tabs.forEach { tab ->
@@ -149,8 +167,15 @@ fun MainAppLayout(storageHelper: StorageHelper) {
             composable("log") {
                 LogScreen(storageHelper = storageHelper)
             }
-            composable("insights") {
-                InsightsScreen()
+            composable("settings") {
+                SettingsScreen(
+                    storageHelper = storageHelper,
+                    onNavigateToOnboarding = {
+                        navController.navigate("onboarding") {
+                            popUpTo("home") { inclusive = false }
+                        }
+                    }
+                )
             }
         }
     }

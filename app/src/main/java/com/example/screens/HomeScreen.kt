@@ -114,6 +114,85 @@ fun HomeScreen(
             }
         }
 
+        // Pad Reminder Banner (Phase 3 Requirement 4)
+        if (daysUntilNextPeriod == 2) {
+            val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+            val padStore = storageHelper.padStore
+            
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("pad_reminder_banner"),
+                colors = CardDefaults.cardColors(containerColor = PrimaryPink.copy(alpha = 0.08f)),
+                shape = RoundedCornerShape(16.dp),
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, PrimaryPink.copy(alpha = 0.3f))
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(text = "🛍️", fontSize = 24.sp)
+                        Column {
+                            Text(
+                                text = "Stock up on pads",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = PrimaryPink
+                            )
+                            Text(
+                                text = "Your period is starting in 2 days. Be prepared!",
+                                fontSize = 12.sp,
+                                color = DarkText.copy(alpha = 0.8f)
+                            )
+                        }
+                    }
+                    
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        val showBlinkit = padStore.isEmpty() || padStore == "Blinkit"
+                        val showAmazon = padStore.isEmpty() || padStore == "Amazon India"
+                        
+                        if (showBlinkit) {
+                            Button(
+                                onClick = { uriHandler.openUri("https://blinkit.com") },
+                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryPink),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(40.dp)
+                                    .testTag("home_blinkit_btn")
+                            ) {
+                                Text("Blinkit", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+                        
+                        if (showAmazon) {
+                            Button(
+                                onClick = { uriHandler.openUri("https://www.amazon.in/s?k=sanitary+pads") },
+                                colors = ButtonDefaults.buttonColors(containerColor = if (padStore.isEmpty()) DarkText.copy(alpha = 0.8f) else PrimaryPink),
+                                shape = RoundedCornerShape(8.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(40.dp)
+                                    .testTag("home_amazon_btn")
+                            ) {
+                                Text("Amazon India", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         // --- Card 1 — Cycle status ---
         Card(
             modifier = Modifier
