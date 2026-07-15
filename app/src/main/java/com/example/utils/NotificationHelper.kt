@@ -22,6 +22,8 @@ object NotificationHelper {
     const val ID_OVULATION_ALERT = 1002
     const val ID_DAILY_LOG = 1003
     const val ID_PAD_REMINDER = 1004
+    const val ID_DAY_BEFORE_MORNING = 1005
+    const val ID_DAY_BEFORE_EVENING = 1006
 
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -119,6 +121,44 @@ object NotificationHelper {
         } else {
             cancelAlarm(context, ID_PAD_REMINDER)
         }
+
+        // 5. Day Before Period notifications
+        if (storageHelper.periodReminderEnabled) {
+            val lang = storageHelper.appLanguage
+            val nextPeriodDate = CycleEngine.getNextPeriodDateProjected(lastPeriodStart, cycleLength)
+            val dayBeforeDate = nextPeriodDate.minusDays(1)
+
+            // Morning at 8:00 AM
+            val morningTriggerTime = getTriggerTimeMillis(dayBeforeDate, 8, 0)
+            if (morningTriggerTime > System.currentTimeMillis()) {
+                scheduleAlarm(
+                    context = context,
+                    id = ID_DAY_BEFORE_MORNING,
+                    triggerTimeMs = morningTriggerTime,
+                    title = com.example.constants.Translations.t("notif_day_before_morning_title", lang),
+                    body = com.example.constants.Translations.t("notif_day_before_morning_body", lang)
+                )
+            } else {
+                cancelAlarm(context, ID_DAY_BEFORE_MORNING)
+            }
+
+            // Evening at 9:00 PM (21:00)
+            val eveningTriggerTime = getTriggerTimeMillis(dayBeforeDate, 21, 0)
+            if (eveningTriggerTime > System.currentTimeMillis()) {
+                scheduleAlarm(
+                    context = context,
+                    id = ID_DAY_BEFORE_EVENING,
+                    triggerTimeMs = eveningTriggerTime,
+                    title = com.example.constants.Translations.t("notif_day_before_evening_title", lang),
+                    body = com.example.constants.Translations.t("notif_day_before_evening_body", lang)
+                )
+            } else {
+                cancelAlarm(context, ID_DAY_BEFORE_EVENING)
+            }
+        } else {
+            cancelAlarm(context, ID_DAY_BEFORE_MORNING)
+            cancelAlarm(context, ID_DAY_BEFORE_EVENING)
+        }
         
         Log.d(TAG, "All notifications successfully scheduled/updated.")
     }
@@ -128,6 +168,8 @@ object NotificationHelper {
         cancelAlarm(context, ID_OVULATION_ALERT)
         cancelAlarm(context, ID_DAILY_LOG)
         cancelAlarm(context, ID_PAD_REMINDER)
+        cancelAlarm(context, ID_DAY_BEFORE_MORNING)
+        cancelAlarm(context, ID_DAY_BEFORE_EVENING)
         Log.d(TAG, "All notifications cancelled.")
     }
 

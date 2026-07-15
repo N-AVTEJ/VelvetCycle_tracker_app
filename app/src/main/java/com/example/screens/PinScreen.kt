@@ -1,18 +1,17 @@
 package com.example.screens
 
-import android.content.Context
 import android.widget.Toast
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Backspace
-import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -23,11 +22,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.example.LocalAppLanguage
+import com.example.components.LockoutTimer
+import com.example.components.NumberPad
+import com.example.components.PinDots
 import com.example.ui.theme.LocalVelvetColors
 import com.example.utils.StorageHelper
 import kotlinx.coroutines.delay
@@ -37,6 +40,7 @@ sealed class PinMode {
     object Verify : PinMode()
     object Setup : PinMode()
     data class Confirm(val firstPin: String) : PinMode()
+    object Change : PinMode()
 }
 
 @Composable
@@ -52,15 +56,17 @@ fun PinScreen(
     val lang = LocalAppLanguage.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    
+
     var currentMode by remember { mutableStateOf(initialMode) }
     var enteredDigits by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     var isShaking by remember { mutableStateOf(false) }
+    var flashSuccess by remember { mutableStateOf(false) }
     var lockoutTimeLeft by remember { mutableStateOf(storageHelper.getLockoutTimeRemaining()) }
+    val lockoutDuration = storageHelper.lockoutDuration
     var showEmergencyConfirm by remember { mutableStateOf(false) }
 
-    // Calculator state
+    // Calculator state (for disguise mode)
     var calcExpression by remember { mutableStateOf("") }
     var calcResult by remember { mutableStateOf("") }
 
@@ -78,23 +84,6 @@ fun PinScreen(
             }
         }
     }
-
-    // Shake animation
-    val shakeOffset by animateFloatAsState(
-        targetValue = if (isShaking) 15f else 0f,
-        animationSpec = keyframes {
-            durationMillis = 300
-            0f at 0
-            -15f at 50
-            15f at 100
-            -15f at 150
-            15f at 200
-            -15f at 250
-            0f at 300
-        },
-        finishedListener = { isShaking = false },
-        label = "shake"
-    )
 
     // Biometric prompt action
     val triggerBiometricAuth = {
@@ -160,7 +149,7 @@ fun PinScreen(
                 val cleanExpr = expr.replace("×", "*").replace("÷", "/")
                 val tokens = mutableListOf<String>()
                 var currentNumber = StringBuilder()
-                
+
                 for (char in cleanExpr) {
                     if (char in '0'..'9' || char == '.') {
                         currentNumber.append(char)
@@ -175,7 +164,7 @@ fun PinScreen(
                 if (currentNumber.isNotEmpty()) {
                     tokens.add(currentNumber.toString())
                 }
-                
+
                 if (tokens.isEmpty()) ""
                 else {
                     var i = 0
@@ -197,7 +186,7 @@ fun PinScreen(
                             i++
                         }
                     }
-                    
+
                     var total = tokens.getOrNull(0)?.toDoubleOrNull() ?: 0.0
                     i = 1
                     while (i < tokens.size) {
@@ -210,7 +199,7 @@ fun PinScreen(
                             break
                         }
                     }
-                    
+
                     val intValue = total.toLong()
                     if (total == intValue.toDouble()) {
                         intValue.toString()
@@ -228,7 +217,7 @@ fun PinScreen(
     val handleWrongAttempt = {
         val attempts = storageHelper.wrongAttempts + 1
         storageHelper.wrongAttempts = attempts
-        
+
         if (attempts >= 10) {
             storageHelper.setLockout(24 * 60 * 60 * 1000L) // 24 hours
             lockoutTimeLeft = storageHelper.getLockoutTimeRemaining()
@@ -250,15 +239,19 @@ fun PinScreen(
             errorMessage = if (lang == "हिंदी") "अत्यधिक गलत प्रयास। 30 सेकंड के लिए अवरुद्ध।" else if (lang == "తెలుగు") "ఎక్కువ सార్లు తప్పుగా టైప్ చేసారు. 30 సెకన్లు లాక్ చేయబడింది." else "Too many wrong attempts. Locked for 30 seconds."
             calcResult = "LOCKED (30s)"
         } else {
-            val remaining = 3 - attempts // attempts before 1st lockout
+            val remaining = 3 - attempts
             val rem = if (remaining > 0) remaining else 1
             errorMessage = if (lang == "हिंदी") "गलत पिन। ${rem} प्रयास शेष।" else if (lang == "తెలుగు") "తప్పు పిన్. ఇంకా ${rem} సార్లు మాత్రమే అవకాశం ఉంది." else "Incorrect PIN. $rem attempts remaining."
             calcResult = "Wrong PIN"
             isShaking = true
+            scope.launch {
+                delay(300)
+                isShaking = false
+            }
         }
     }
 
-    // Normal PIN input
+    // Normal PIN input handling
     val onDigitPressed: (String) -> Unit = { digit ->
         if (lockoutTimeLeft > 0) {
             val secondsLeft = (lockoutTimeLeft / 1000L)
@@ -280,7 +273,10 @@ fun PinScreen(
                             is PinMode.Verify -> {
                                 val savedPin = storageHelper.userPin
                                 if (savedPin == pin) {
+                                    flashSuccess = true
                                     storageHelper.clearLockout()
+                                    delay(400)
+                                    flashSuccess = false
                                     onUnlocked()
                                 } else {
                                     handleWrongAttempt()
@@ -288,20 +284,30 @@ fun PinScreen(
                             }
                             is PinMode.Setup -> {
                                 currentMode = PinMode.Confirm(pin)
-                                errorMessage = if (lang == "हिंदी") "अपने 4-अंकीय पिन की पुष्टि करें" else if (lang == "తెలుగు") "మీ 4-అంకెల పిన్‌ని నిర్ధారించండి" else "Confirm your 4-digit PIN"
+                                errorMessage = ""
                             }
                             is PinMode.Confirm -> {
                                 if (mode.firstPin == pin) {
+                                    flashSuccess = true
                                     storageHelper.userPin = pin
-                                    val savedSuccessMsg = if (lang == "हिंदी") "पिन सफलतापूर्वक सहेजा गया!" else if (lang == "తెలుగు") "పిన్ విజయవంతంగా సేవ్ చేయబడింది!" else "PIN Saved Successfully!"
-                                    Toast.makeText(context, savedSuccessMsg, Toast.LENGTH_SHORT).show()
+                                    delay(400)
+                                    flashSuccess = false
                                     onSetupComplete()
                                 } else {
                                     errorMessage = if (lang == "हिंदी") "पिन मेल नहीं खाए। फिर से शुरू करें।" else if (lang == "తెలుగు") "పిన్ మ్యాచ్ కాలేదు. మళ్లీ మొదలు పెట్టండి." else "PINs did not match. Start over."
                                     isShaking = true
-                                    delay(1000)
+                                    delay(500)
+                                    isShaking = false
                                     currentMode = PinMode.Setup
                                 }
+                            }
+                            is PinMode.Change -> {
+                                // For Change mode: save pin and complete
+                                flashSuccess = true
+                                storageHelper.userPin = pin
+                                delay(400)
+                                flashSuccess = false
+                                onSetupComplete()
                             }
                         }
                     }
@@ -337,6 +343,7 @@ fun PinScreen(
             },
             confirmButton = {
                 TextButton(
+                    modifier = Modifier.testTag("wipe_confirm_btn"),
                     onClick = {
                         showEmergencyConfirm = false
                         onEmergencyWipe()
@@ -389,9 +396,9 @@ fun PinScreen(
                     textAlign = TextAlign.End,
                     modifier = Modifier.fillMaxWidth().testTag("calc_expression")
                 )
-                
+
                 Spacer(modifier = Modifier.height(12.dp))
-                
+
                 // Result line (showing countdown timer if locked)
                 val displayResultText = if (lockoutTimeLeft > 0) {
                     val totalSecs = (lockoutTimeLeft / 1000L).toInt()
@@ -579,170 +586,169 @@ fun PinScreen(
         }
     } else {
         // --- BEAUTIFUL STANDARD VELVETCYCLE PIN DESIGN ---
-        val subTitleLabel = if (lang == "हिंदी") "आपका सुरक्षित चक्र साथी" else if (lang == "తెలుగు") "మీ సురక్షిత సైకిల్ గైడ్" else "YOUR INTIMATE HEALTH PARTNER"
-
-        val instructions = when (currentMode) {
-            is PinMode.Verify -> if (lang == "हिंदी") "अनलॉक करने के लिए पिन दर्ज करें" else if (lang == "తెలుగు") "అన్‌లాక్ చేయడానికి పిన్ నమోదు చేయండి" else "Enter PIN to unlock"
-            is PinMode.Setup -> if (lang == "हिंदी") "एक सुरक्षित 4-अंकीय पिन सेट करें" else if (lang == "తెలుగు") "సురక్షితమైన 4-అంకెల పిన్ సెట్ చేయండి" else "Set a secure 4-digit PIN"
-            is PinMode.Confirm -> if (lang == "हिंदी") "पुष्टि करने के लिए फिर से पिन दर्ज करें" else if (lang == "తెలుగు") "ధృవీకరించడానికి పిన్‌ను మళ్లీ నమోదు చేయండి" else "Re-enter PIN to confirm"
+        val headerText = when (currentMode) {
+            is PinMode.Verify -> if (lang == "हिंदी") "अनलॉक करने के लिए पिन दर्ज करें" else if (lang == "తెలుగు") "అన్‌లాక్ చేయడానికి పిన్ నమోదు చేయండి" else "Enter your PIN"
+            is PinMode.Setup -> if (lang == "हिंदी") "पिन बनाएं" else if (lang == "తెలుగు") "పిన్ సృష్టించండి" else "Create a PIN"
+            is PinMode.Confirm -> if (lang == "हिंदी") "पिन की पुष्टि करें" else if (lang == "తెలుగు") "పిన్‌ని నిర్ధారించండి" else "Confirm your PIN"
+            is PinMode.Change -> if (lang == "हिंदी") "नया पिन दर्ज करें" else if (lang == "తెలుగు") "కొత్త పిన్ నమోదు చేయండి" else "Enter new PIN"
         }
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(colors.background)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Logo and Title Area
+        val subTitleLabel = if (lang == "हिंदी") "आपका सुरक्षित चक्र साथी" else if (lang == "తెలుగు") "మీ సురక్షిత సైకిల్ గైడ్" else "YOUR INTIMATE HEALTH PARTNER"
+
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = colors.background
+        ) { paddingValues ->
             Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(top = 40.dp)
+                verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(
-                    text = "VelvetCycle",
-                    fontSize = 32.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.pinkAccent,
-                    textAlign = TextAlign.Center,
-                    letterSpacing = 1.sp
-                )
-                
-                Text(
-                    text = subTitleLabel,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textSecondary,
-                    letterSpacing = 2.sp,
-                    modifier = Modifier.padding(top = 4.dp, bottom = 32.dp)
-                )
-
-                Text(
-                    text = instructions,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = colors.textPrimary,
-                    modifier = Modifier.padding(bottom = 16.dp)
-                )
-
-                // Dynamic Dot Indicators
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier
-                        .offset(x = shakeOffset.dp)
-                        .padding(vertical = 16.dp)
-                        .testTag("pin_dots_container")
+                // TOP SECTION: Logo, small lock icon, and Header Texts
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.padding(top = 24.dp)
                 ) {
-                    for (i in 1..4) {
-                        val isFilled = enteredDigits.length >= i
-                        Box(
-                            modifier = Modifier
-                                .size(16.dp)
-                                .clip(CircleShape)
-                                .background(if (isFilled) colors.pinkAccent else colors.textSecondary.copy(alpha = 0.3f))
-                                .testTag("pin_dot_$i")
-                        )
-                    }
-                }
-
-                // Error Display Label
-                if (errorMessage.isNotEmpty()) {
-                    Text(
-                        text = errorMessage,
-                        color = MaterialTheme.colorScheme.error,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier
-                            .padding(top = 8.dp)
-                            .testTag("pin_error_text")
-                    )
-                }
-            }
-
-            // Numpad Column Layout
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(bottom = 24.dp)
-            ) {
-                val keys = listOf(
-                    listOf("1", "2", "3"),
-                    listOf("4", "5", "6"),
-                    listOf("7", "8", "9")
-                )
-
-                keys.forEach { rowKeys ->
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(24.dp),
-                        modifier = Modifier.padding(vertical = 8.dp)
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        rowKeys.forEach { digit ->
-                            NumpadButton(digit, onClick = { onDigitPressed(digit) })
-                        }
-                    }
-                }
-
-                // Bottom row containing biometric trigger, 0, and backspace
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
-                    modifier = Modifier.padding(vertical = 8.dp)
-                ) {
-                    if (currentMode == PinMode.Verify && storageHelper.biometricEnabled && isBiometricHardwareAvailable) {
-                        Box(
-                            modifier = Modifier
-                                .size(72.dp)
-                                .clip(CircleShape)
-                                .background(colors.pinkAccent.copy(alpha = 0.1f))
-                                .clickable { triggerBiometricAuth() }
-                                .testTag("pin_btn_biometric"),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Fingerprint,
-                                contentDescription = "Fingerprint",
-                                tint = colors.pinkAccent,
-                                modifier = Modifier.size(28.dp)
-                            )
-                        }
-                    } else {
-                        Spacer(modifier = Modifier.size(72.dp))
-                    }
-
-                    NumpadButton("0", onClick = { onDigitPressed("0") })
-
-                    Box(
-                        modifier = Modifier
-                            .size(72.dp)
-                            .clip(CircleShape)
-                            .clickable { onBackspacePressed() }
-                            .testTag("pin_btn_backspace"),
-                        contentAlignment = Alignment.Center
-                    ) {
+                        Text(
+                            text = "VelvetCycle",
+                            fontSize = 32.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.pinkAccent,
+                            letterSpacing = 1.sp
+                        )
                         Icon(
-                            imageVector = Icons.Default.Backspace,
-                            contentDescription = "Backspace",
-                            tint = colors.textPrimary,
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Locked",
+                            tint = colors.pinkAccent,
                             modifier = Modifier.size(24.dp)
                         )
                     }
+
+                    Text(
+                        text = subTitleLabel,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textSecondary,
+                        letterSpacing = 2.sp,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
+                    )
+
+                    // Lockout mode vs Normal PIN entry
+                    if (lockoutTimeLeft > 0) {
+                        val isTier10 = storageHelper.wrongAttempts >= 10
+                        LockoutTimer(
+                            timeLeftMs = lockoutTimeLeft,
+                            totalDurationMs = lockoutDuration,
+                            isDataProtectionWarning = isTier10,
+                            modifier = Modifier.padding(vertical = 16.dp)
+                        )
+                    } else {
+                        Text(
+                            text = headerText,
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = colors.textPrimary,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+
+                        // 4 custom dots
+                        PinDots(
+                            enteredLength = enteredDigits.length,
+                            isShaking = isShaking,
+                            flashSuccess = flashSuccess,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+
+                        // Error message
+                        if (errorMessage.isNotEmpty()) {
+                            Text(
+                                text = errorMessage,
+                                color = MaterialTheme.colorScheme.error,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier
+                                    .padding(top = 8.dp)
+                                    .testTag("pin_error_text")
+                            )
+                        }
+                    }
                 }
 
-                if (onCancelSetup != null && (currentMode is PinMode.Setup || currentMode is PinMode.Confirm)) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    val cancelSetupLabel = if (lang == "हिंदी") "सेटअप रद्द करें" else if (lang == "తెలుగు") "సెటప్ రద్దు చేయి" else "Cancel Setup"
-                    TextButton(
-                        onClick = onCancelSetup,
-                        modifier = Modifier.testTag("pin_cancel_setup_button")
+                // MIDDLE/BOTTOM SECTION: NumberPad & Links
+                if (lockoutTimeLeft <= 0) {
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(16.dp),
+                        modifier = Modifier.padding(bottom = 8.dp)
                     ) {
-                        Text(
-                            text = cancelSetupLabel,
-                            color = colors.pinkAccent,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 14.sp
+                        NumberPad(
+                            onDigitClick = onDigitPressed,
+                            onDeleteClick = onBackspacePressed,
+                            showBiometric = (currentMode == PinMode.Verify && storageHelper.biometricEnabled && isBiometricHardwareAvailable),
+                            onBiometricClick = { triggerBiometricAuth() }
                         )
+
+                        // Action links / buttons at bottom
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            if (currentMode == PinMode.Verify) {
+                                // "Forgot PIN? Delete all data" link
+                                Text(
+                                    text = if (lang == "हिंदी") "पिन भूल गए? सारा डेटा मिटाएं" else if (lang == "తెలుగు") "పిన్ మర్చిపోయారా? మొత్తం డేటా తుడిచివేయండి" else "Forgot PIN? Delete all data",
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.error,
+                                    textDecoration = TextDecoration.Underline,
+                                    modifier = Modifier
+                                        .clickable { showEmergencyConfirm = true }
+                                        .padding(8.dp)
+                                        .testTag("pin_forgot_wipe_button")
+                                )
+
+                                if (storageHelper.biometricEnabled && isBiometricHardwareAvailable) {
+                                    // "Use fingerprint" button
+                                    Text(
+                                        text = if (lang == "हिंदी") "फिंगरप्रिंट का उपयोग करें" else if (lang == "తెలుగు") "వేలిముద్ర ఉపయోగించండి" else "Use fingerprint",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.pinkAccent,
+                                        modifier = Modifier
+                                            .clickable { triggerBiometricAuth() }
+                                            .padding(8.dp)
+                                            .testTag("pin_use_biometric_text_btn")
+                                    )
+                                }
+                            }
+
+                            if (onCancelSetup != null && (currentMode is PinMode.Setup || currentMode is PinMode.Confirm)) {
+                                val cancelSetupLabel = if (lang == "हिंदी") "सेटअप रद्द करें" else if (lang == "తెలుగు") "సెటప్ రద్దు చేయి" else "Cancel Setup"
+                                TextButton(
+                                    onClick = onCancelSetup,
+                                    modifier = Modifier.testTag("pin_cancel_setup_button")
+                                ) {
+                                    Text(
+                                        text = cancelSetupLabel,
+                                        color = colors.pinkAccent,
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 14.sp
+                                    )
+                                }
+                            }
+                        }
                     }
+                } else {
+                    // Spacer when locked out to maintain spacing
+                    Spacer(modifier = Modifier.height(1.dp))
                 }
             }
         }
@@ -759,8 +765,8 @@ fun CalculatorButton(
 ) {
     Box(
         modifier = modifier
-            .aspectRatio(1f)
-            .clip(CircleShape)
+            .aspectRatio(1.2f)
+            .clip(RoundedCornerShape(16.dp))
             .background(backgroundColor)
             .clickable { onClick() }
             .testTag("calc_btn_$label"),
@@ -771,30 +777,6 @@ fun CalculatorButton(
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
             color = textColor
-        )
-    }
-}
-
-@Composable
-fun NumpadButton(
-    digit: String,
-    onClick: () -> Unit
-) {
-    val colors = LocalVelvetColors.current
-    Box(
-        modifier = Modifier
-            .size(72.dp)
-            .clip(CircleShape)
-            .background(colors.cardBackground)
-            .clickable { onClick() }
-            .testTag("pin_btn_$digit"),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = digit,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = colors.textPrimary
         )
     }
 }

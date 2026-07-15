@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -176,6 +177,7 @@ fun CalendarScreen(
                                 val isPeriod = isPeriodDay(date, lastPeriodStart, cycleLength, periodDuration)
                                 val isFertile = isFertileDay(date, lastPeriodStart, cycleLength)
                                 val isOvulation = isOvulationDay(date, lastPeriodStart, cycleLength)
+                                val isPrepare = isPrepareDay(date, lastPeriodStart, cycleLength)
                                 val isToday = date == today
                                 val isSelected = date == selectedDate
 
@@ -218,6 +220,14 @@ fun CalendarScreen(
                                                     .size(5.dp)
                                                     .clip(CircleShape)
                                                     .background(Teal)
+                                            )
+                                        } else if (isPrepare) {
+                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .size(5.dp)
+                                                    .clip(CircleShape)
+                                                    .background(Color(0xFFFFA726))
                                             )
                                         }
                                     }
@@ -292,6 +302,7 @@ fun CalendarScreen(
                                 .background(
                                     when {
                                         isPeriod -> colors.pinkAccent
+                                        isPrepare -> Color(0xFFFFA726)
                                         isOvulation -> Teal
                                         isFertile -> FertileGreen
                                         else -> colors.border
@@ -469,4 +480,35 @@ private fun isFertileDay(date: LocalDate, lastPeriodStart: LocalDate, cycleLengt
     val fertileStart = ovulationDayNum - 5
     val fertileEnd = ovulationDayNum + 1
     return mod in fertileStart..fertileEnd
+}
+
+private fun isPrepareDay(date: LocalDate, lastPeriodStart: LocalDate, cycleLength: Int): Boolean {
+    val daysBetween = ChronoUnit.DAYS.between(lastPeriodStart, date)
+    val mod = if (daysBetween >= 0) {
+        daysBetween % cycleLength
+    } else {
+        ((daysBetween % cycleLength) + cycleLength) % cycleLength
+    }
+    return mod == (cycleLength - 1).toLong()
+}
+
+@Composable
+private fun LegendItem(color: Color, label: String, isDot: Boolean) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(if (isDot) 8.dp else 12.dp)
+                .clip(if (isDot) CircleShape else RoundedCornerShape(3.dp))
+                .background(color)
+        )
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Medium,
+            color = LocalVelvetColors.current.textSecondary
+        )
+    }
 }

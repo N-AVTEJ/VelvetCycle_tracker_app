@@ -3,6 +3,8 @@ package com.example.screens
 import android.app.AlertDialog
 import android.app.TimePickerDialog
 import android.widget.Toast
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,12 +20,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import com.example.LocalAppLanguage
 import com.example.constants.Translations
 import com.example.ui.theme.LocalVelvetColors
@@ -51,6 +56,7 @@ fun SettingsScreen(
     var displayName by remember { mutableStateOf(storageHelper.userName) }
     var isEditingName by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+    var showRemovePinConfirm by remember { mutableStateOf(false) }
     
     // Notification toggles
     var periodReminder by remember { mutableStateOf(storageHelper.periodReminderEnabled) }
@@ -62,7 +68,7 @@ fun SettingsScreen(
     // Privacy & PIN states
     var isPinSet by remember { mutableStateOf(storageHelper.userPin != null) }
     var biometricEnabled by remember { mutableStateOf(storageHelper.biometricEnabled) }
-    var pinSetupMode by remember { mutableStateOf<PinMode?>(null) } 
+    var activePrivacyFlow by remember { mutableStateOf<String?>(null) } // "setup", "change", or null
     var disguiseEnabled by remember { mutableStateOf(storageHelper.disguiseMode) }
 
     // Store & Language states
@@ -83,17 +89,26 @@ fun SettingsScreen(
         NotificationHelper.scheduleAllNotifications(context, storageHelper)
     }
 
-    if (pinSetupMode != null) {
-        PinScreen(
+    if (activePrivacyFlow == "setup") {
+        PinSetupScreen(
             storageHelper = storageHelper,
-            initialMode = pinSetupMode!!,
-            onSetupComplete = {
+            onFinished = {
                 isPinSet = storageHelper.userPin != null
-                pinSetupMode = null
+                activePrivacyFlow = null
                 rescheduleNotifications()
             },
-            onCancelSetup = {
-                pinSetupMode = null
+            onCancel = {
+                activePrivacyFlow = null
+            }
+        )
+    } else if (activePrivacyFlow == "change") {
+        PinChangeScreen(
+            storageHelper = storageHelper,
+            onFinished = {
+                activePrivacyFlow = null
+            },
+            onCancel = {
+                activePrivacyFlow = null
             }
         )
     } else {
@@ -357,86 +372,276 @@ fun SettingsScreen(
             }
 
             // --- SECTION 3: PRIVACY & SECURITY ---
+            val isBiometricHardwareAvailable = remember {
+                val biometricManager = BiometricManager.from(context)
+                val canAuth = biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)
+                canAuth == BiometricManager.BIOMETRIC_SUCCESS
+            }
+
+            val triggerBiometricVerifyAndEnable: (Boolean) -> Unit = { enabled ->
+                if (enabled) {
+                    val activity = context as? FragmentActivity
+                    if (activity != null) {
+                        val executor = ContextCompat.getMainExecutor(context)
+                        val biometricPrompt = BiometricPrompt(
+                            activity,
+                            executor,
+                            object : BiometricPrompt.AuthenticationCallback() {
+                                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                                    super.onAuthenticationError(errorCode, errString)
+                                    biometricEnabled = false
+                                    storageHelper.biometricEnabled = false
+                                    Toast.makeText(context, errString, Toast.LENGTH_SHORT).show()
+                                }
+
+                                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                                    super.onAuthenticationSucceeded(result)
+                                    biometricEnabled = true
+                                    storageHelper.biometricEnabled = true
+                                    Toast.makeText(context, if (lang == "हिंदी") "बायोमेट्रिक सक्षम!" else "Biometric enabled!", Toast.LENGTH_SHORT).show()
+                                }
+
+                                override fun onAuthenticationFailed() {
+                                    super.onAuthenticationFailed()
+                                }
+                            }
+                        )
+
+                        val promptTitle = if (lang == "हिंदी") "बायोमेट्रिक की पुष्टि करें" else "Confirm Biometric"
+                        val promptSubtitle = if (lang == "हिंदी") "सक्षम करने के लिए प्रमाणित करें" else "Authenticate to enable biometric unlock"
+                        val promptNegative = if (lang == "हिंदी") "रद्द करें" else "Cancel"
+
+                        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                            .setTitle(promptTitle)
+                            .setSubtitle(promptSubtitle)
+                            .setNegativeButtonText(promptNegative)
+                            .build()
+
+                        biometricPrompt.authenticate(promptInfo)
+                    } else {
+                        biometricEnabled = false
+                        storageHelper.biometricEnabled = false
+                        Toast.makeText(context, "FragmentActivity not available", Toast.LENGTH_SHORT).show()
+                    }
+                } else {
+                    biometricEnabled = false
+                    storageHelper.biometricEnabled = false
+                    Toast.makeText(context, if (lang == "हिंदी") "बायोमेट्रिक अक्षम" else "Biometric disabled", Toast.LENGTH_SHORT).show()
+                }
+            }
+
             SettingsSectionCard(title = Translations.t("section_privacy", lang)) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    NotificationToggleItem(
-                        title = Translations.t("lbl_biometric", lang),
-                        subtitle = Translations.t("lbl_biometric_sub", lang),
-                        checked = biometricEnabled,
-                        onCheckedChange = {
-                            biometricEnabled = it
-                            storageHelper.biometricEnabled = it
+                    if (!isPinSet) {
+                        // Unprotected state warning
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFFFFF3CD))
+                                .border(1.dp, Color(0xFFFFEBAA), RoundedCornerShape(12.dp))
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(text = "⚠️", fontSize = 24.sp, modifier = Modifier.testTag("privacy_unprotected_warning_icon"))
+                            Text(
+                                text = if (lang == "हिंदी") "आपका ऐप वर्तमान में असुरक्षित है। अपने चक्र डेटा को सुरक्षित करने के लिए एक पिन सेट करें।" else if (lang == "తెలుగు") "మీ యాప్ ప్రస్తుతం అసురక్షితంగా ఉంది. మీ సైకిల్ డేటాను రక్షించడానికి పిన్‌ని సెట్ చేయండి." else "Your app is currently unprotected. Set a PIN to secure your intimate cycle data.",
+                                color = Color(0xFF856404),
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                modifier = Modifier.weight(1f).testTag("privacy_unprotected_warning_text")
+                            )
                         }
-                    )
-                    Divider(color = colors.border, thickness = 0.5.dp)
 
-                    NotificationToggleItem(
-                        title = if (lang == "हिंदी") "ऐप छुपाएं" else if (lang == "తెలుగు") "యాప్‌ను దాచండి" else "Disguise app",
-                        subtitle = if (lang == "हिंदी") "अनलॉक स्क्रीन को एक कैलकुलेटर के रूप में छुपाएं" else if (lang == "తెలుగు") "లాక్ స్క్రీన్‌ను సాధారణ కాలిక్యులేటర్‌గా చూపించు" else "Disguise PIN screen as a plain calculator",
-                        checked = disguiseEnabled,
-                        onCheckedChange = {
-                            disguiseEnabled = it
-                            storageHelper.disguiseMode = it
-                        }
-                    )
-                    Divider(color = colors.border, thickness = 0.5.dp)
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
                         Button(
-                            onClick = {
-                                pinSetupMode = PinMode.Setup
-                            },
+                            onClick = { activePrivacyFlow = "setup" },
                             colors = ButtonDefaults.buttonColors(containerColor = colors.pinkAccent),
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
-                                .weight(1f)
+                                .fillMaxWidth()
+                                .height(48.dp)
                                 .testTag("set_pin_button")
                         ) {
-                            Icon(
-                                imageVector = Icons.Default.Lock,
-                                contentDescription = null,
-                                tint = colors.cardBackground,
-                                modifier = Modifier.size(16.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
+                            Icon(imageVector = Icons.Default.Lock, contentDescription = null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 text = Translations.t("btn_set_pin", lang),
-                                fontSize = 12.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = colors.cardBackground
+                                color = Color.White
                             )
                         }
+                    } else {
+                        // Protected state UI
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(colors.pinkAccent.copy(alpha = 0.08f))
+                                .border(1.dp, colors.pinkAccent.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                                .padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Text(text = "🛡️", fontSize = 24.sp, modifier = Modifier.testTag("privacy_protected_icon"))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (lang == "हिंदी") "ऐप लॉक सक्रिय है" else if (lang == "తెలుగు") "యాప్ లాక్ సక్రియంగా ఉంది" else "App lock is active",
+                                    color = colors.pinkAccent,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.testTag("privacy_protected_title")
+                                )
+                                Text(
+                                    text = if (lang == "हिंदी") "आपका व्यक्तिगत डेटा सुरक्षित है" else if (lang == "తెలుగు") "మీ వ్యక్తిగత డేటా సురక్షితంగా ఉంది" else "Intimate cycle data is secured",
+                                    color = colors.textSecondary,
+                                    fontSize = 11.sp,
+                                    modifier = Modifier.testTag("privacy_protected_subtitle")
+                                )
+                            }
+                        }
 
-                        if (isPinSet) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
                             Button(
-                                onClick = {
-                                    storageHelper.userPin = null
-                                    isPinSet = false
-                                    Toast.makeText(context, if (lang == "हिंदी") "पिन हटा दिया गया!" else if (lang == "తెలుగు") "పిన్ తొలగించబడింది!" else "PIN removed!", Toast.LENGTH_SHORT).show()
-                                },
+                                onClick = { activePrivacyFlow = "change" },
+                                colors = ButtonDefaults.buttonColors(containerColor = colors.pinkAccent),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(44.dp)
+                                    .testTag("change_pin_button")
+                            ) {
+                                Text(
+                                    text = if (lang == "हिंदी") "पिन बदलें" else if (lang == "తెలుగు") "పిన్ మార్చండి" else "Change PIN",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+
+                            Button(
+                                onClick = { showRemovePinConfirm = true },
                                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer),
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier
-                                    .weight(1.1f)
+                                    .weight(1f)
+                                    .height(44.dp)
                                     .testTag("remove_pin_button")
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onErrorContainer,
-                                    modifier = Modifier.size(16.dp)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = Translations.t("btn_remove_pin", lang),
-                                    fontSize = 11.sp,
+                                    text = if (lang == "हिंदी") "पिन हटाएं" else if (lang == "తెలుగు") "పిన్ తొలగించండి" else "Remove PIN",
+                                    fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
+                        }
+
+                        Divider(color = colors.border, thickness = 0.5.dp)
+
+                        // Fingerprint toggle row
+                        if (isBiometricHardwareAvailable) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Fingerprint,
+                                        contentDescription = null,
+                                        tint = colors.pinkAccent,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Column {
+                                        Text(
+                                            text = if (lang == "हिंदी") "बायोमेट्रिक अनलॉक" else if (lang == "తెలుగు") "బయోమెట్రిక్ అన్‌లాక్" else "Biometric unlock",
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = colors.textPrimary,
+                                            modifier = Modifier.testTag("settings_biometric_title")
+                                        )
+                                        Text(
+                                            text = if (lang == "हिंदी") "अनलॉक करने के लिए उंगली या चेहरे का उपयोग करें" else if (lang == "తెలుగు") "అన్‌లాక్ చేయడానికి వేలిముద్ర లేదా ఫేస్ లాక్ ఉపయోగించండి" else "Use fingerprint or face to unlock",
+                                            fontSize = 11.sp,
+                                            color = colors.textSecondary,
+                                            modifier = Modifier.testTag("settings_biometric_subtitle")
+                                        )
+                                    }
+                                }
+                                Switch(
+                                    checked = biometricEnabled,
+                                    onCheckedChange = { checked ->
+                                        triggerBiometricVerifyAndEnable(checked)
+                                    },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = Color.White,
+                                        checkedTrackColor = colors.pinkAccent,
+                                        uncheckedThumbColor = colors.textSecondary,
+                                        uncheckedTrackColor = colors.border
+                                    ),
+                                    modifier = Modifier.testTag("settings_biometric_switch")
+                                )
+                            }
+
+                            Divider(color = colors.border, thickness = 0.5.dp)
+                        }
+
+                        // Disguise app toggle row
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Calculate,
+                                    contentDescription = null,
+                                    tint = colors.pinkAccent,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Column {
+                                    Text(
+                                        text = if (lang == "हिंदी") "ऐप छुपाएं" else if (lang == "తెలుగు") "యాప్‌ను దాచండి" else "Disguise app",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.textPrimary,
+                                        modifier = Modifier.testTag("settings_disguise_title")
+                                    )
+                                    Text(
+                                        text = if (lang == "हिंदी") "अनलॉक स्क्रीन को एक कैलकुलेटर के रूप में छुपाएं" else if (lang == "తెలుగు") "లాక్ స్క్రీన్‌ను సాధారణ కాలిక్యులేటర్ లాగా చూపించు" else "Hide PIN entry screen behind a working calculator",
+                                        fontSize = 11.sp,
+                                        color = colors.textSecondary,
+                                        modifier = Modifier.testTag("settings_disguise_subtitle")
+                                    )
+                                }
+                            }
+                            Switch(
+                                checked = disguiseEnabled,
+                                onCheckedChange = { checked ->
+                                    disguiseEnabled = checked
+                                    storageHelper.disguiseMode = checked
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = colors.pinkAccent,
+                                    uncheckedThumbColor = colors.textSecondary,
+                                    uncheckedTrackColor = colors.border
+                                ),
+                                modifier = Modifier.testTag("settings_disguise_switch")
+                            )
                         }
                     }
                 }
@@ -445,37 +650,57 @@ fun SettingsScreen(
             // --- SECTION 4: PAD STORE PREFERENCE ---
             SettingsSectionCard(title = Translations.t("section_store", lang)) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    val stores = listOf("Amazon", "Target", "Walmart", "Local Pharmacy")
+                    val stores = listOf(
+                        Pair("blinkit", "🟡"),
+                        Pair("zepto", "🟣")
+                    )
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        stores.forEach { store ->
-                            val isSelected = selectedStore == store
+                        stores.forEach { (storeKey, icon) ->
+                            val isSelected = selectedStore == storeKey
+                            val storeName = if (storeKey == "blinkit") Translations.t("store_blinkit", lang) else Translations.t("store_zepto", lang)
+                            val borderColor = if (isSelected) {
+                                if (storeKey == "blinkit") Color(0xFFF5C518) else Color(0xFF7B2FF7)
+                            } else {
+                                colors.border
+                            }
+                            val borderWidth = if (isSelected) 2.dp else 1.dp
+                            
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
-                                    .clip(RoundedCornerShape(8.dp))
-                                    .background(if (isSelected) colors.pinkAccent else colors.background)
+                                    .heightIn(min = 48.dp)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(colors.background)
                                     .border(
-                                        width = 1.dp,
-                                        color = if (isSelected) colors.pinkAccent else colors.border,
-                                        shape = RoundedCornerShape(8.dp)
+                                        width = borderWidth,
+                                        color = borderColor,
+                                        shape = RoundedCornerShape(12.dp)
                                     )
                                     .clickable {
-                                        selectedStore = store
-                                        storageHelper.padStore = store
+                                        val newStore = if (isSelected) "" else storeKey
+                                        selectedStore = newStore
+                                        storageHelper.padStore = newStore
                                     }
-                                    .padding(vertical = 10.dp),
+                                    .testTag("settings_store_$storeKey")
+                                    .padding(horizontal = 8.dp, vertical = 12.dp),
                                 contentAlignment = Alignment.Center
                             ) {
-                                Text(
-                                    text = store,
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = if (isSelected) colors.cardBackground else colors.textPrimary,
-                                    maxLines = 1
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(text = icon, fontSize = 18.sp)
+                                    Text(
+                                        text = storeName,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.textPrimary,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
                             }
                         }
                     }
@@ -703,6 +928,54 @@ fun SettingsScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text(
+                        text = if (lang == "हिंदी") "रद्द करें" else if (lang == "తెలుగు") "రద్దు చేయి" else "Cancel",
+                        color = colors.textSecondary
+                    )
+                }
+            },
+            containerColor = colors.cardBackground
+        )
+    }
+
+    // --- Remove PIN Confirmation Alert Dialog ---
+    if (showRemovePinConfirm) {
+        AlertDialog(
+            onDismissRequest = { showRemovePinConfirm = false },
+            title = {
+                Text(
+                    text = if (lang == "हिंदी") "पिन लॉक हटाएं?" else if (lang == "తెలుగు") "పిన్ లాక్ తొలగించాలా?" else "Disable App Lock?",
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary
+                )
+            },
+            text = {
+                Text(
+                    text = if (lang == "हिंदी") "क्या आप वाकई ऐप लॉक हटाना चाहते हैं? इसके बिना आपका संवेदनशील चक्र डेटा कोई भी देख सकता है।" else if (lang == "తెలుగు") "మీరు నిజంగా యాప్ లాక్‌ని నిలిపివేయాలనుకుంటున్నారా? ఇది లేకపోతే ఎవరైనా మీ వ్యక్తిగत సైకిల్ వివరాలను చూడగలరు." else "Are you sure you want to disable PIN protection? Anyone with physical access to your device will be able to read your private cycle logs.",
+                    color = colors.textPrimary,
+                    fontSize = 14.sp
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        storageHelper.userPin = null
+                        storageHelper.biometricEnabled = false
+                        biometricEnabled = false
+                        isPinSet = false
+                        showRemovePinConfirm = false
+                        Toast.makeText(context, if (lang == "हिंदी") "पिन सुरक्षा हटा दी गई" else if (lang == "తెలుగు") "పిన్ రక్షణ నిలిపివేయబడింది" else "PIN protection disabled", Toast.LENGTH_SHORT).show()
+                    }
+                ) {
+                    Text(
+                        text = if (lang == "हिंदी") "हां, हटाएं" else if (lang == "తెలుగు") "అవును, తొలగించు" else "Yes, Disable",
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRemovePinConfirm = false }) {
                     Text(
                         text = if (lang == "हिंदी") "रद्द करें" else if (lang == "తెలుగు") "రద్దు చేయి" else "Cancel",
                         color = colors.textSecondary

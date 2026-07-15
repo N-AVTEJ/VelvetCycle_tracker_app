@@ -82,4 +82,12 @@ object CycleEngine {
             else -> "luteal"
         }
     }
+
+    /**
+     * Returns true if today is exactly the day before the predicted next period date.
+     */
+    fun isDayBeforePeriod(lastPeriodStart: LocalDate, cycleLength: Int, today: LocalDate = LocalDate.now()): Boolean {
+        val nextPeriod = getNextPeriodDateProjected(lastPeriodStart, cycleLength, today)
+        return today.plusDays(1) == nextPeriod
+    }
 }

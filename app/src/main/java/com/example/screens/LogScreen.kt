@@ -13,6 +13,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.TextStyle
@@ -48,6 +49,10 @@ fun LogScreen(storageHelper: StorageHelper) {
 
     val scrollState = rememberScrollState()
 
+    val lastPeriodStart = storageHelper.lastPeriodStart
+    val cycleLength = storageHelper.cycleLength
+    val isDayBefore = com.example.utils.CycleEngine.isDayBeforePeriod(lastPeriodStart, cycleLength)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -56,6 +61,26 @@ fun LogScreen(storageHelper: StorageHelper) {
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        if (isDayBefore) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFFFF3E0))
+                    .border(1.dp, Color(0xFFFFB74D), RoundedCornerShape(12.dp))
+                    .padding(16.dp)
+                    .testTag("day_before_banner_log")
+            ) {
+                Text(
+                    text = Translations.t("period_expected_tomorrow_log", lang),
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFFE65100),
+                    lineHeight = 20.sp
+                )
+            }
+        }
+
         // Header
         Column(
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)

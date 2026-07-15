@@ -276,6 +276,10 @@ class StorageHelper(context: Context) {
         set(value) = saveSecureBoolean("notif_pad_reminder", value)
 
     // --- ADVANCED LOCKOUT & TIMEOUT MANAGEMENT ---
+    var lockoutDuration: Long
+        get() = getSecureLong("lockout_duration", 0L)
+        set(value) = saveSecureLong("lockout_duration", value)
+
     fun getLockoutTimeRemaining(): Long {
         val expiration = getSecureLong("lockout_expiration_time", 0L)
         if (expiration == 0L) return 0L
@@ -284,11 +288,13 @@ class StorageHelper(context: Context) {
     }
 
     fun setLockout(durationMs: Long) {
+        lockoutDuration = durationMs
         saveSecureLong("lockout_expiration_time", System.currentTimeMillis() + durationMs)
     }
 
     fun clearLockout() {
         saveSecureLong("lockout_expiration_time", 0L)
+        lockoutDuration = 0L
         saveSecureInt("pin_attempts", 0)
     }
 

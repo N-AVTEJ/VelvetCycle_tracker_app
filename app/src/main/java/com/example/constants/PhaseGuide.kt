@@ -40,7 +40,16 @@ object PhaseGuide {
         )
     )
 
-    fun getGuide(phase: String): PhaseGuideData {
+    fun getGuide(phase: String, isDayBefore: Boolean = false): PhaseGuideData {
+        if (isDayBefore) {
+            return PhaseGuideData(
+                body = "Your cycle is completing today. Hormones are dropping which causes PMS. Completely normal — your body is preparing to reset.",
+                foodMorning = "Banana, warm oats, ginger tea. No coffee.",
+                foodAfternoon = "Light meal. Sweet potato or brown rice. No salt or junk food.",
+                foodEvening = "Warm soup or khichdi. Chamomile tea before bed. Eat early.",
+                exercise = "No intense workout. Gentle yoga only. Child's pose and cat-cow. Rest is more important than exercise today."
+            )
+        }
         return guides[phase.lowercase()] ?: PhaseGuideData(
             body = "Stay tuned to your body's natural cycle and practice self-care.",
             foodMorning = "Healthy fruits, water, light breakfast.",
