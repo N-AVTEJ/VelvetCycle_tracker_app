@@ -31,34 +31,47 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.DarkText
-import com.example.ui.theme.LightPinkBg
-import com.example.ui.theme.PrimaryPink
-import com.example.ui.theme.White
+import com.example.LocalAppLanguage
+import com.example.constants.Translations
+import com.example.ui.theme.LocalVelvetColors
 import com.example.utils.StorageHelper
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.util.Calendar
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OnboardingScreen(
     storageHelper: StorageHelper,
     onOnboardingFinished: () -> Unit
 ) {
+    val colors = LocalVelvetColors.current
+    val lang = LocalAppLanguage.current
+
     var step by remember { mutableStateOf(1) }
     
     // Onboarding form state
-    var name by remember { mutableStateOf("") }
-    var lastPeriodStart by remember { mutableStateOf(LocalDate.now()) }
-    var periodDuration by remember { mutableStateOf(5) }
-    var cycleLength by remember { mutableStateOf(28) }
+    var name by remember { mutableStateOf(storageHelper.userName) }
+    var lastPeriodStart by remember { mutableStateOf(storageHelper.lastPeriodStart) }
+    var periodDuration by remember { mutableStateOf(storageHelper.periodDuration.coerceIn(1, 9)) }
+    var cycleLength by remember { mutableStateOf(storageHelper.cycleLength.coerceIn(21, 35)) }
 
     val context = LocalContext.current
-    val dateFormatter = remember { DateTimeFormatter.ofPattern("MMMM d, yyyy") }
+
+    // Localized Strings
+    val backButtonLabel = if (lang == "हिंदी") "पीछे" else if (lang == "తెలుగు") "వెనుకకు" else "Back"
+    val nextButtonLabel = if (lang == "हिंदी") "आगे" else if (lang == "తెలుగు") "తరువాత" else "Next"
+    val finishButtonLabel = if (lang == "हिंदी") "समाप्त" else if (lang == "తెలుగు") "ముగించు" else "Finish"
+
+    val step1Title = if (lang == "हिंदी") "आपका नाम क्या है?" else if (lang == "తెలుగు") "మీ పేరు ఏమిటి?" else "What's your name?"
+    val step1Placeholder = if (lang == "हिंदी") "अपना नाम दर्ज करें" else if (lang == "తెలుగు") "మీ పేరు నమోదు చేయండి" else "Enter your name"
+
+    val step2Title = if (lang == "हिंदी") "आपका पिछला मासिक धर्म कब शुरू हुआ था?" else if (lang == "తెలుగు") "మీ చివరి పీరియడ్ ఎప్పుడు ప్రారంభమైంది?" else "When did your last period start?"
+    val step2Subtitle = if (lang == "हिंदी") "पिछले मासिक धर्म का पहला दिन" else if (lang == "తెలుగు") "చివరి పీరియడ్ మొదటి రోజు" else "First day of last period"
+
+    val step3Title = if (lang == "हिंदी") "आपका मासिक धर्म आमतौर पर कितने दिनों तक रहता है?" else if (lang == "తెలుగు") "సాధారణంగా మీ పీరియడ్ ఎన్ని రోజులు ఉంటుంది?" else "How many days does your period usually last?"
+    val step4Title = if (lang == "हिंदी") "आपका सामान्य चक्र कितना लंबा होता है?" else if (lang == "తెలుగు") "మీ సాధారణ సైకిల్ ఎన్ని రోజులు ఉంటుంది?" else "How long is your usual cycle?"
 
     Scaffold(
-        containerColor = LightPinkBg
+        containerColor = colors.background
     ) { paddingValues ->
         Column(
             modifier = Modifier
@@ -68,7 +81,7 @@ fun OnboardingScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header: Title & Step indicators
+            // Header
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier.fillMaxWidth()
@@ -77,7 +90,7 @@ fun OnboardingScreen(
                     text = "VelvetCycle",
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
-                    color = PrimaryPink,
+                    color = colors.pinkAccent,
                     letterSpacing = 1.sp,
                     modifier = Modifier.padding(top = 16.dp)
                 )
@@ -85,14 +98,14 @@ fun OnboardingScreen(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Text(
-                    text = "Your intimate cycle companion",
+                    text = if (lang == "हिंदी") "आपका सुरक्षित चक्र साथी" else if (lang == "తెలుగు") "మీ సురక్షిత సైకిల్ గైడ్" else "Your intimate cycle companion",
                     fontSize = 14.sp,
-                    color = DarkText.copy(alpha = 0.6f)
+                    color = colors.textSecondary
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // Progress Dots
+                // Progress Indicator Dots
                 Row(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
@@ -104,13 +117,13 @@ fun OnboardingScreen(
                                 .padding(horizontal = 4.dp)
                                 .size(width = if (step == i) 24.dp else 8.dp, height = 8.dp)
                                 .clip(CircleShape)
-                                .background(if (step == i) PrimaryPink else PrimaryPink.copy(alpha = 0.3f))
+                                .background(if (step == i) colors.pinkAccent else colors.pinkAccent.copy(alpha = 0.3f))
                         )
                     }
                 }
             }
 
-            // Main Content Area with transitions
+            // Main steps transition content
             Box(
                 modifier = Modifier
                     .weight(1f)
@@ -131,27 +144,27 @@ fun OnboardingScreen(
                         when (targetStep) {
                             1 -> {
                                 Text(
-                                    text = "What's your name?",
+                                    text = step1Title,
                                     fontSize = 22.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = DarkText,
+                                    color = colors.textPrimary,
                                     textAlign = TextAlign.Center
                                 )
                                 Spacer(modifier = Modifier.height(24.dp))
                                 OutlinedTextField(
                                     value = name,
                                     onValueChange = { name = it },
-                                    placeholder = { Text("Enter your name") },
+                                    placeholder = { Text(step1Placeholder, color = colors.textSecondary.copy(alpha = 0.6f)) },
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(
                                         capitalization = KeyboardCapitalization.Words,
                                         imeAction = ImeAction.Done
                                     ),
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = PrimaryPink,
-                                        unfocusedBorderColor = PrimaryPink.copy(alpha = 0.4f),
-                                        focusedLabelColor = PrimaryPink,
-                                        cursorColor = PrimaryPink
+                                        focusedBorderColor = colors.pinkAccent,
+                                        unfocusedBorderColor = colors.border,
+                                        focusedTextColor = colors.textPrimary,
+                                        unfocusedTextColor = colors.textPrimary
                                     ),
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -162,10 +175,10 @@ fun OnboardingScreen(
                             }
                             2 -> {
                                 Text(
-                                    text = "When did your last period start?",
+                                    text = step2Title,
                                     fontSize = 22.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = DarkText,
+                                    color = colors.textPrimary,
                                     textAlign = TextAlign.Center
                                 )
                                 Spacer(modifier = Modifier.height(24.dp))
@@ -186,9 +199,9 @@ fun OnboardingScreen(
                                                 lastPeriodStart.dayOfMonth
                                             ).show()
                                         },
-                                    colors = CardDefaults.cardColors(containerColor = White),
+                                    colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
                                     shape = RoundedCornerShape(16.dp),
-                                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
                                 ) {
                                     Row(
                                         modifier = Modifier
@@ -199,22 +212,22 @@ fun OnboardingScreen(
                                     ) {
                                         Column {
                                             Text(
-                                                text = "First day of last period",
+                                                text = step2Subtitle,
                                                 fontSize = 12.sp,
-                                                color = DarkText.copy(alpha = 0.5f)
+                                                color = colors.textSecondary
                                             )
                                             Text(
-                                                text = lastPeriodStart.format(dateFormatter),
+                                                text = Translations.formatDate(lastPeriodStart, lang),
                                                 fontSize = 18.sp,
                                                 fontWeight = FontWeight.SemiBold,
-                                                color = DarkText,
+                                                color = colors.textPrimary,
                                                 modifier = Modifier.padding(top = 4.dp)
                                             )
                                         }
                                         Icon(
                                             imageVector = Icons.Default.CalendarMonth,
                                             contentDescription = "Pick date",
-                                            tint = PrimaryPink,
+                                            tint = colors.pinkAccent,
                                             modifier = Modifier.size(28.dp)
                                         )
                                     }
@@ -222,10 +235,10 @@ fun OnboardingScreen(
                             }
                             3 -> {
                                 Text(
-                                    text = "How many days does your period usually last?",
+                                    text = step3Title,
                                     fontSize = 22.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = DarkText,
+                                    color = colors.textPrimary,
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier.padding(horizontal = 16.dp)
                                 )
@@ -242,10 +255,10 @@ fun OnboardingScreen(
                                             modifier = Modifier
                                                 .size(36.dp)
                                                 .clip(CircleShape)
-                                                .background(if (isSelected) PrimaryPink else White)
+                                                .background(if (isSelected) colors.pinkAccent else colors.cardBackground)
                                                 .border(
                                                     width = 1.dp,
-                                                    color = if (isSelected) PrimaryPink else PrimaryPink.copy(alpha = 0.2f),
+                                                    color = if (isSelected) colors.pinkAccent else colors.border,
                                                     shape = CircleShape
                                                 )
                                                 .clickable { periodDuration = num }
@@ -254,7 +267,7 @@ fun OnboardingScreen(
                                                 text = num.toString(),
                                                 fontSize = 16.sp,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isSelected) White else DarkText
+                                                color = if (isSelected) colors.cardBackground else colors.textPrimary
                                             )
                                         }
                                     }
@@ -262,10 +275,10 @@ fun OnboardingScreen(
                             }
                             4 -> {
                                 Text(
-                                    text = "How long is your usual cycle?",
+                                    text = step4Title,
                                     fontSize = 22.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = DarkText,
+                                    color = colors.textPrimary,
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier.padding(horizontal = 16.dp)
                                 )
@@ -287,10 +300,10 @@ fun OnboardingScreen(
                                             modifier = Modifier
                                                 .aspectRatio(1f)
                                                 .clip(CircleShape)
-                                                .background(if (isSelected) PrimaryPink else White)
+                                                .background(if (isSelected) colors.pinkAccent else colors.cardBackground)
                                                 .border(
                                                     width = 1.dp,
-                                                    color = if (isSelected) PrimaryPink else PrimaryPink.copy(alpha = 0.2f),
+                                                    color = if (isSelected) colors.pinkAccent else colors.border,
                                                     shape = CircleShape
                                                 )
                                                 .clickable { cycleLength = num }
@@ -299,7 +312,7 @@ fun OnboardingScreen(
                                                 text = num.toString(),
                                                 fontSize = 16.sp,
                                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                                color = if (isSelected) White else DarkText
+                                                color = if (isSelected) colors.cardBackground else colors.textPrimary
                                             )
                                         }
                                     }
@@ -310,7 +323,7 @@ fun OnboardingScreen(
                 }
             }
 
-            // Bottom Navigation: Back & Next Buttons
+            // Bottom controls bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -322,8 +335,8 @@ fun OnboardingScreen(
                 if (step > 1) {
                     OutlinedButton(
                         onClick = { step-- },
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = PrimaryPink),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, PrimaryPink),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.pinkAccent),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, colors.pinkAccent),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .weight(1f)
@@ -332,24 +345,24 @@ fun OnboardingScreen(
                     ) {
                         Icon(imageVector = Icons.Default.ChevronLeft, contentDescription = "Back")
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("Back", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(backButtonLabel, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 }
 
-                // Next / Finish Button
+                // Next or Finish Button
                 Button(
                     onClick = {
                         if (step < 4) {
                             step++
                         } else {
-                            // Finish onboarding and save
+                            // Save user cycle data
                             storageHelper.userName = name.trim()
                             storageHelper.lastPeriodStart = lastPeriodStart
                             storageHelper.periodDuration = periodDuration
                             storageHelper.cycleLength = cycleLength
                             storageHelper.isOnboarded = true
                             
-                            // Schedule push notifications on onboarding completion
+                            // Reschedule alerts
                             com.example.utils.NotificationHelper.scheduleAllNotifications(context, storageHelper)
                             
                             onOnboardingFinished()
@@ -357,10 +370,10 @@ fun OnboardingScreen(
                     },
                     enabled = step != 1 || name.trim().isNotEmpty(),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = PrimaryPink,
-                        disabledContainerColor = PrimaryPink.copy(alpha = 0.4f),
-                        contentColor = White,
-                        disabledContentColor = White.copy(alpha = 0.6f)
+                        containerColor = colors.pinkAccent,
+                        disabledContainerColor = colors.pinkAccent.copy(alpha = 0.4f),
+                        contentColor = colors.cardBackground,
+                        disabledContentColor = colors.cardBackground.copy(alpha = 0.6f)
                     ),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
@@ -370,7 +383,7 @@ fun OnboardingScreen(
                         .testTag(if (step == 4) "submit_button" else "next_button")
                 ) {
                     Text(
-                        text = if (step == 4) "Finish" else "Next",
+                        text = if (step == 4) finishButtonLabel else nextButtonLabel,
                         fontWeight = FontWeight.Bold,
                         fontSize = 16.sp
                     )

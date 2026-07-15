@@ -4,15 +4,25 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
+    
+    <!-- Elegant Crescent Moon -->
     <path
-        android:fillColor="#FFF0F5"
-        android:pathData="M54,34c-4,-12 -20,-12 -20,2c0,14 20,32 20,32s20,-18 20,-32c0,-14 -16,-12 -20,-2z" />
+        android:fillColor="#FF80AB"
+        android:pathData="M72,34 A24,24 0 1,0 44,76 A28,28 0 1,1 72,34 Z" />
+
+    <!-- Blooming Lotus flower - Left Petal -->
     <path
-        android:fillColor="#4ECDC4"
-        android:pathData="M54,44 a4,4 0 1,1 0,-8 a4,4 0 1,1 0,8" />
+        android:fillColor="#FF4081"
+        android:pathData="M54,48 C43,51 40,63 47,67 C52,65 53,57 54,48 Z" />
+
+    <!-- Blooming Lotus flower - Right Petal -->
     <path
-        android:strokeColor="#FFFFFF"
-        android:strokeWidth="2"
-        android:fillColor="#00000000"
-        android:pathData="M54,24 A30,30 0 1,1 53.99,24" />
+        android:fillColor="#FF4081"
+        android:pathData="M54,48 C65,51 68,63 61,67 C56,65 55,57 54,48 Z" />
+
+    <!-- Blooming Lotus flower - Center Droplet Petal -->
+    <path
+        android:fillColor="#FFD54F"
+        android:pathData="M54,34 C49,42 49,58 54,66 C59,58 59,42 54,34 Z" />
+        
 </vector>

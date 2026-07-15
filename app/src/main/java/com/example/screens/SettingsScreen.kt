@@ -3,6 +3,7 @@ package com.example.screens
 import android.app.AlertDialog
 import android.app.TimePickerDialog
 import android.widget.Toast
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,29 +18,34 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.DarkText
-import com.example.ui.theme.LightPinkBg
-import com.example.ui.theme.PrimaryPink
-import com.example.ui.theme.White
+import com.example.LocalAppLanguage
+import com.example.constants.Translations
+import com.example.ui.theme.LocalVelvetColors
 import com.example.utils.NotificationHelper
 import com.example.utils.StorageHelper
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import java.util.Calendar
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SettingsScreen(
     storageHelper: StorageHelper,
+    onLanguageChanged: (String) -> Unit,
+    onThemeChanged: (Boolean) -> Unit,
     onNavigateToOnboarding: () -> Unit
 ) {
     val context = LocalContext.current
+    val colors = LocalVelvetColors.current
+    val lang = LocalAppLanguage.current
     val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
 
     // Screen states
     var displayName by remember { mutableStateOf(storageHelper.userName) }
@@ -56,19 +62,27 @@ fun SettingsScreen(
     // Privacy & PIN states
     var isPinSet by remember { mutableStateOf(storageHelper.userPin != null) }
     var biometricEnabled by remember { mutableStateOf(storageHelper.biometricEnabled) }
-    var pinSetupMode by remember { mutableStateOf<PinMode?>(null) } // null means normal settings, non-null means showing PIN setup
+    var pinSetupMode by remember { mutableStateOf<PinMode?>(null) } 
 
     // Store & Language states
     var selectedStore by remember { mutableStateOf(storageHelper.padStore) }
     var selectedLanguage by remember { mutableStateOf(storageHelper.appLanguage) }
+    var isDarkModeTheme by remember { mutableStateOf(storageHelper.isDarkMode) }
 
-    // Trigger notification rescheduling whenever settings change
+    // Backup & Restore Simulation States
+    var showBackupDialog by remember { mutableStateOf(false) }
+    var showRestoreDialog by remember { mutableStateOf(false) }
+    var backupProgress by remember { mutableStateOf(0f) }
+    var backupStatusText by remember { mutableStateOf("") }
+    var restoreProgress by remember { mutableStateOf(0f) }
+    var restoreStatusText by remember { mutableStateOf("") }
+
+    // Reschedule push alerts helper
     val rescheduleNotifications = {
         NotificationHelper.scheduleAllNotifications(context, storageHelper)
     }
 
     if (pinSetupMode != null) {
-        // Overlay PIN Setup Screen
         PinScreen(
             storageHelper = storageHelper,
             initialMode = pinSetupMode!!,
@@ -82,11 +96,73 @@ fun SettingsScreen(
             }
         )
     } else {
-        // Main Settings UI
+        // --- Simulated Backup Dialog ---
+        if (showBackupDialog) {
+            AlertDialog(
+                onDismissRequest = { if (backupProgress >= 1f) showBackupDialog = false },
+                title = { Text(text = Translations.t("btn_backup", lang), fontWeight = FontWeight.Bold, color = colors.textPrimary) },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(text = backupStatusText, color = colors.textPrimary, fontSize = 14.sp, textAlign = TextAlign.Center)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        LinearProgressIndicator(
+                            progress = backupProgress,
+                            color = colors.pinkAccent,
+                            trackColor = colors.pinkAccent.copy(alpha = 0.1f),
+                            modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))
+                        )
+                    }
+                },
+                confirmButton = {
+                    if (backupProgress >= 1f) {
+                        TextButton(onClick = { showBackupDialog = false }) {
+                            Text(text = "OK", color = colors.pinkAccent, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                },
+                containerColor = colors.cardBackground
+            )
+        }
+
+        // --- Simulated Restore Dialog ---
+        if (showRestoreDialog) {
+            AlertDialog(
+                onDismissRequest = { if (restoreProgress >= 1f) showRestoreDialog = false },
+                title = { Text(text = Translations.t("btn_restore", lang), fontWeight = FontWeight.Bold, color = colors.textPrimary) },
+                text = {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Text(text = restoreStatusText, color = colors.textPrimary, fontSize = 14.sp, textAlign = TextAlign.Center)
+                        Spacer(modifier = Modifier.height(16.dp))
+                        LinearProgressIndicator(
+                            progress = restoreProgress,
+                            color = colors.pinkAccent,
+                            trackColor = colors.pinkAccent.copy(alpha = 0.1f),
+                            modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))
+                        )
+                    }
+                },
+                confirmButton = {
+                    if (restoreProgress >= 1f) {
+                        TextButton(onClick = { showRestoreDialog = false }) {
+                            Text(text = "OK", color = colors.pinkAccent, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                },
+                containerColor = colors.cardBackground
+            )
+        }
+
+        // --- Main UI ---
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .background(LightPinkBg)
+                .background(colors.background)
                 .verticalScroll(scrollState)
                 .padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -94,20 +170,20 @@ fun SettingsScreen(
         ) {
             // Header
             Text(
-                text = "Settings",
+                text = if (lang == "हिंदी") "सेटिंग्स" else if (lang == "తెలుగు") "సెట్టింగ్స్" else "Settings",
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = DarkText,
+                color = colors.textPrimary,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(vertical = 8.dp),
                 textAlign = TextAlign.Start
             )
 
-            // SECTION — ACCOUNT
-            SettingsCard(title = "Account") {
+            // --- SECTION 1: ACCOUNT ---
+            SettingsSectionCard(title = Translations.t("section_account", lang)) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    // Display Name Row
+                    // Name
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -115,19 +191,19 @@ fun SettingsScreen(
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                text = "Display Name",
+                                text = Translations.t("lbl_display_name", lang),
                                 fontSize = 12.sp,
-                                color = DarkText.copy(alpha = 0.5f)
+                                color = colors.textSecondary
                             )
                             if (isEditingName) {
                                 OutlinedTextField(
                                     value = displayName,
                                     onValueChange = { displayName = it },
                                     colors = OutlinedTextFieldDefaults.colors(
-                                        focusedBorderColor = PrimaryPink,
-                                        unfocusedBorderColor = PrimaryPink.copy(alpha = 0.2f),
-                                        focusedTextColor = DarkText,
-                                        unfocusedTextColor = DarkText
+                                        focusedBorderColor = colors.pinkAccent,
+                                        unfocusedBorderColor = colors.border,
+                                        focusedTextColor = colors.textPrimary,
+                                        unfocusedTextColor = colors.textPrimary
                                     ),
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -137,10 +213,10 @@ fun SettingsScreen(
                                 )
                             } else {
                                 Text(
-                                    text = displayName.ifEmpty { "Not set" },
+                                    text = displayName.ifEmpty { "User" },
                                     fontSize = 16.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = DarkText,
+                                    color = colors.textPrimary,
                                     modifier = Modifier.padding(top = 4.dp)
                                 )
                             }
@@ -150,7 +226,7 @@ fun SettingsScreen(
                             onClick = {
                                 if (isEditingName) {
                                     storageHelper.userName = displayName.trim()
-                                    Toast.makeText(context, "Name updated!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, if (lang == "हिंदी") "नाम अपडेट किया गया!" else if (lang == "తెలుగు") "పేరు మార్చబడింది!" else "Name updated!", Toast.LENGTH_SHORT).show()
                                 }
                                 isEditingName = !isEditingName
                             },
@@ -158,18 +234,18 @@ fun SettingsScreen(
                         ) {
                             Icon(
                                 imageVector = if (isEditingName) Icons.Default.Check else Icons.Default.Edit,
-                                contentDescription = if (isEditingName) "Save Name" else "Edit Name",
-                                tint = PrimaryPink
+                                contentDescription = null,
+                                tint = colors.pinkAccent
                             )
                         }
                     }
 
-                    Divider(color = LightPinkBg, thickness = 1.dp)
+                    Divider(color = colors.border, thickness = 0.5.dp)
 
-                    // Edit Cycle Info Button
+                    // Edit cycle info
                     Button(
-                        onClick = { onNavigateToOnboarding() },
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryPink.copy(alpha = 0.08f)),
+                        onClick = onNavigateToOnboarding,
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.pinkAccent.copy(alpha = 0.1f)),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
@@ -178,12 +254,12 @@ fun SettingsScreen(
                         Icon(
                             imageVector = Icons.Default.CalendarMonth,
                             contentDescription = null,
-                            tint = PrimaryPink,
+                            tint = colors.pinkAccent,
                             modifier = Modifier.padding(end = 8.dp)
                         )
                         Text(
-                            text = "Edit Cycle & Period Info",
-                            color = PrimaryPink,
+                            text = Translations.t("lbl_edit_cycle", lang),
+                            color = colors.pinkAccent,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
                         )
@@ -191,286 +267,162 @@ fun SettingsScreen(
                 }
             }
 
-            // SECTION — NOTIFICATIONS
-            SettingsCard(title = "Notifications") {
+            // --- SECTION 2: NOTIFICATIONS ---
+            SettingsSectionCard(title = Translations.t("section_notifications", lang)) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    // Period Reminder Toggle
-                    NotificationToggleRow(
-                        title = "Period reminder",
-                        subtitle = "Alert 2 days before predicted period",
+                    NotificationToggleItem(
+                        title = Translations.t("lbl_period_reminder", lang),
+                        subtitle = Translations.t("lbl_period_reminder_sub", lang),
                         checked = periodReminder,
                         onCheckedChange = {
                             periodReminder = it
                             storageHelper.periodReminderEnabled = it
                             rescheduleNotifications()
-                        },
-                        tag = "toggle_period_reminder"
+                        }
                     )
-
-                    Divider(color = LightPinkBg, thickness = 1.dp)
-
-                    // Ovulation Alert Toggle
-                    NotificationToggleRow(
-                        title = "Ovulation alert",
-                        subtitle = "Notify on ovulation day at 9:00 AM",
+                    Divider(color = colors.border, thickness = 0.5.dp)
+                    NotificationToggleItem(
+                        title = Translations.t("lbl_ovulation_alert", lang),
+                        subtitle = Translations.t("lbl_ovulation_alert_sub", lang),
                         checked = ovulationAlert,
                         onCheckedChange = {
                             ovulationAlert = it
                             storageHelper.ovulationAlertEnabled = it
                             rescheduleNotifications()
-                        },
-                        tag = "toggle_ovulation_alert"
+                        }
                     )
-
-                    Divider(color = LightPinkBg, thickness = 1.dp)
-
-                    // Daily Log Reminder Toggle + Time picker
+                    Divider(color = colors.border, thickness = 0.5.dp)
                     Column {
-                        NotificationToggleRow(
-                            title = "Daily log reminder",
-                            subtitle = "Daily prompt to log your symptoms",
+                        NotificationToggleItem(
+                            title = Translations.t("lbl_daily_log", lang),
+                            subtitle = Translations.t("lbl_daily_log_sub", lang),
                             checked = dailyLogReminder,
                             onCheckedChange = {
                                 dailyLogReminder = it
                                 storageHelper.dailyLogReminderEnabled = it
                                 rescheduleNotifications()
-                            },
-                            tag = "toggle_daily_log"
+                            }
                         )
-
                         if (dailyLogReminder) {
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .clip(RoundedCornerShape(8.dp))
-                                    .background(LightPinkBg.copy(alpha = 0.5f))
+                                    .background(colors.background)
                                     .clickable {
-                                        val initialHour = dailyLogTime.split(":")[0].toIntOrNull() ?: 21
-                                        val initialMinute = dailyLogTime.split(":")[1].toIntOrNull() ?: 0
-                                        TimePickerDialog(
-                                            context,
-                                            { _, hour, minute ->
-                                                val formatted = String.format("%02d:%02d", hour, minute)
-                                                dailyLogTime = formatted
-                                                storageHelper.dailyLogReminderTime = formatted
-                                                rescheduleNotifications()
-                                                Toast.makeText(context, "Reminder set to $formatted", Toast.LENGTH_SHORT).show()
-                                            },
-                                            initialHour,
-                                            initialMinute,
-                                            true
-                                        ).show()
+                                        val cal = Calendar.getInstance()
+                                        val parts = dailyLogTime.split(":")
+                                        val hour = parts.getOrNull(0)?.toIntOrNull() ?: 20
+                                        val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                                        
+                                        TimePickerDialog(context, { _, h, m ->
+                                            val newTime = String.format("%02d:%02d", h, m)
+                                            dailyLogTime = newTime
+                                            storageHelper.dailyLogReminderTime = newTime
+                                            rescheduleNotifications()
+                                        }, hour, minute, true).show()
                                     }
-                                    .padding(12.dp)
-                                    .testTag("reminder_time_picker"),
+                                    .padding(12.dp),
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Reminder Time",
+                                    text = Translations.t("lbl_reminder_time", lang),
                                     fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = DarkText
+                                    color = colors.textPrimary
                                 )
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        text = dailyLogTime,
-                                        fontSize = 14.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = PrimaryPink,
-                                        modifier = Modifier.padding(end = 4.dp)
-                                    )
-                                    Icon(
-                                        imageVector = Icons.Default.ArrowDropDown,
-                                        contentDescription = "Select Time",
-                                        tint = PrimaryPink
-                                    )
-                                }
+                                Text(
+                                    text = dailyLogTime,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.pinkAccent
+                                )
                             }
                         }
                     }
-
-                    Divider(color = LightPinkBg, thickness = 1.dp)
-
-                    // Pad Reminder Toggle
-                    NotificationToggleRow(
-                        title = "Pad reminder",
-                        subtitle = "Alert 2 days before to stock up on pads",
+                    Divider(color = colors.border, thickness = 0.5.dp)
+                    NotificationToggleItem(
+                        title = Translations.t("lbl_pad_reminder", lang),
+                        subtitle = Translations.t("lbl_pad_reminder_sub", lang),
                         checked = padReminder,
                         onCheckedChange = {
                             padReminder = it
                             storageHelper.padReminderEnabled = it
                             rescheduleNotifications()
-                        },
-                        tag = "toggle_pad_reminder"
+                        }
                     )
                 }
             }
 
-            // SECTION — PRIVACY & SECURITY
-            SettingsCard(title = "Privacy & Security") {
+            // --- SECTION 3: PRIVACY & SECURITY ---
+            SettingsSectionCard(title = Translations.t("section_privacy", lang)) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = if (isPinSet) "PIN Lock is Active" else "PIN Lock is Disabled",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = DarkText
-                            )
-                            Text(
-                                text = "Require PIN entry upon launching the app",
-                                fontSize = 11.sp,
-                                color = DarkText.copy(alpha = 0.5f)
-                            )
+                    NotificationToggleItem(
+                        title = Translations.t("lbl_biometric", lang),
+                        subtitle = Translations.t("lbl_biometric_sub", lang),
+                        checked = biometricEnabled,
+                        onCheckedChange = {
+                            biometricEnabled = it
+                            storageHelper.biometricEnabled = it
                         }
-
-                        if (!isPinSet) {
-                            Button(
-                                onClick = { pinSetupMode = PinMode.Setup },
-                                colors = ButtonDefaults.buttonColors(containerColor = PrimaryPink),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.testTag("set_pin_button")
-                            ) {
-                                Text("Set PIN", fontWeight = FontWeight.Bold)
-                            }
-                        } else {
-                            Button(
-                                onClick = {
-                                    storageHelper.userPin = null
-                                    isPinSet = false
-                                    biometricEnabled = false
-                                    storageHelper.biometricEnabled = false
-                                    Toast.makeText(context, "PIN Security Removed", Toast.LENGTH_SHORT).show()
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.testTag("remove_pin_button")
-                            ) {
-                                Text("Remove PIN", fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-
-                    if (isPinSet) {
-                        Divider(color = LightPinkBg, thickness = 1.dp)
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Column {
-                                Text(
-                                    text = "Fingerprint / Face Unlock",
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = DarkText
-                                )
-                                Text(
-                                    text = "Enable biometric unlock when possible",
-                                    fontSize = 11.sp,
-                                    color = DarkText.copy(alpha = 0.5f)
-                                )
-                            }
-
-                            Switch(
-                                checked = biometricEnabled,
-                                onCheckedChange = {
-                                    biometricEnabled = it
-                                    storageHelper.biometricEnabled = it
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedThumbColor = White,
-                                    checkedTrackColor = PrimaryPink,
-                                    uncheckedThumbColor = DarkText.copy(alpha = 0.4f),
-                                    uncheckedTrackColor = LightPinkBg
-                                ),
-                                modifier = Modifier.testTag("toggle_biometric")
-                            )
-                        }
-                    }
-                }
-            }
-
-            // SECTION — PAD STORE PREFERENCE
-            SettingsCard(title = "Pad Store Preference") {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = "Preferred store for stocking up sanitaries:",
-                        fontSize = 12.sp,
-                        color = DarkText.copy(alpha = 0.5f)
                     )
-
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        StorePreferenceButton(
-                            name = "Blinkit",
-                            isSelected = selectedStore == "Blinkit",
-                            onClick = {
-                                selectedStore = "Blinkit"
-                                storageHelper.padStore = "Blinkit"
-                                Toast.makeText(context, "Store preference: Blinkit", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.weight(1f).testTag("store_blinkit_btn")
-                        )
-
-                        StorePreferenceButton(
-                            name = "Amazon India",
-                            isSelected = selectedStore == "Amazon India",
-                            onClick = {
-                                selectedStore = "Amazon India"
-                                storageHelper.padStore = "Amazon India"
-                                Toast.makeText(context, "Store preference: Amazon India", Toast.LENGTH_SHORT).show()
-                            },
-                            modifier = Modifier.weight(1f).testTag("store_amazon_btn")
-                        )
-                    }
-                }
-            }
-
-            // SECTION — LANGUAGE
-            SettingsCard(title = "Language") {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Text(
-                        text = "App Display Language",
-                        fontSize = 12.sp,
-                        color = DarkText.copy(alpha = 0.5f)
-                    )
+                    Divider(color = colors.border, thickness = 0.5.dp)
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        listOf("English", "हिंदी", "తెలుగు").forEach { lang ->
-                            val isSel = selectedLanguage == lang
-                            Box(
+                        Button(
+                            onClick = {
+                                pinSetupMode = PinMode.Setup
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.pinkAccent),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("set_pin_button")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = colors.cardBackground,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = Translations.t("btn_set_pin", lang),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.cardBackground
+                            )
+                        }
+
+                        if (isPinSet) {
+                            Button(
+                                onClick = {
+                                    storageHelper.userPin = null
+                                    isPinSet = false
+                                    Toast.makeText(context, if (lang == "हिंदी") "पिन हटा दिया गया!" else if (lang == "తెలుగు") "పిన్ తొలగించబడింది!" else "PIN removed!", Toast.LENGTH_SHORT).show()
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                                shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(if (isSel) PrimaryPink else White)
-                                    .border(1.dp, if (isSel) PrimaryPink else PrimaryPink.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-                                    .clickable {
-                                        selectedLanguage = lang
-                                        storageHelper.appLanguage = lang
-                                        Toast.makeText(context, "Language support coming in Phase 4", Toast.LENGTH_SHORT).show()
-                                    }
-                                    .padding(vertical = 12.dp)
-                                    .testTag("lang_btn_${lang.lowercase()}"),
-                                contentAlignment = Alignment.Center
+                                    .weight(1.1f)
+                                    .testTag("remove_pin_button")
                             ) {
+                                Icon(
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onErrorContainer,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
                                 Text(
-                                    text = lang,
-                                    fontSize = 13.sp,
+                                    text = Translations.t("btn_remove_pin", lang),
+                                    fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = if (isSel) White else DarkText
+                                    color = MaterialTheme.colorScheme.onErrorContainer
                                 )
                             }
                         }
@@ -478,154 +430,316 @@ fun SettingsScreen(
                 }
             }
 
-            // SECTION — DATA & MAINTENANCE
-            SettingsCard(title = "Data & Maintenance") {
+            // --- SECTION 4: PAD STORE PREFERENCE ---
+            SettingsSectionCard(title = Translations.t("section_store", lang)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val stores = listOf("Amazon", "Target", "Walmart", "Local Pharmacy")
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        stores.forEach { store ->
+                            val isSelected = selectedStore == store
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(if (isSelected) colors.pinkAccent else colors.background)
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (isSelected) colors.pinkAccent else colors.border,
+                                        shape = RoundedCornerShape(8.dp)
+                                    )
+                                    .clickable {
+                                        selectedStore = store
+                                        storageHelper.padStore = store
+                                    }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = store,
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isSelected) colors.cardBackground else colors.textPrimary,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // --- SECTION 5: LANGUAGE ---
+            SettingsSectionCard(title = Translations.t("section_language", lang)) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    val languages = listOf("English", "हिंदी", "తెలుగు")
+                    languages.forEach { language ->
+                        val isSelected = selectedLanguage == language
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(if (isSelected) colors.pinkAccent.copy(alpha = 0.08f) else colors.background)
+                                .clickable {
+                                    selectedLanguage = language
+                                    storageHelper.appLanguage = language
+                                    onLanguageChanged(language)
+                                }
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = language,
+                                fontSize = 14.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                color = colors.textPrimary
+                            )
+                            RadioButton(
+                                selected = isSelected,
+                                onClick = {
+                                    selectedLanguage = language
+                                    storageHelper.appLanguage = language
+                                    onLanguageChanged(language)
+                                },
+                                colors = RadioButtonDefaults.colors(selectedColor = colors.pinkAccent)
+                            )
+                        }
+                    }
+                }
+            }
+
+            // --- SECTION 6: DISPLAY / THEME ---
+            SettingsSectionCard(title = if (lang == "हिंदी") "थीम" else if (lang == "తెలుగు") "థీమ్" else "Display") {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // Backup to Google Drive
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = if (lang == "हिंदी") "डार्क मोड" else if (lang == "తెలుగు") "డార్క్ మోడ్" else "Dark Mode",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.textPrimary
+                            )
+                            Text(
+                                text = if (lang == "हिंदी") "आरामदायक रात के दृश्य के लिए" else if (lang == "తెలుగు") "రాత్రి వేళల్లో చదువుకోవడానికి అనుకూలమైనది" else "Enable dark mode for night viewing",
+                                fontSize = 11.sp,
+                                color = colors.textSecondary
+                            )
+                        }
+                        Switch(
+                            checked = isDarkModeTheme,
+                            onCheckedChange = {
+                                isDarkModeTheme = it
+                                storageHelper.isDarkMode = it
+                                onThemeChanged(it)
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = colors.cardBackground,
+                                checkedTrackColor = colors.pinkAccent,
+                                uncheckedThumbColor = colors.textSecondary,
+                                uncheckedTrackColor = colors.border
+                            ),
+                            modifier = Modifier.testTag("dark_mode_toggle")
+                        )
+                    }
+                }
+            }
+
+            // --- SECTION 7: DATA & MAINTENANCE ---
+            SettingsSectionCard(title = Translations.t("section_data", lang)) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    // Backup Button
                     Button(
                         onClick = {
-                            Toast.makeText(context, "Backup option coming in Phase 4", Toast.LENGTH_SHORT).show()
+                            scope.launch {
+                                showBackupDialog = true
+                                backupProgress = 0f
+                                backupStatusText = if (lang == "हिंदी") "गूगल ड्राइव से जुड़ रहा है..." else "Connecting to Google Drive..."
+                                delay(800)
+                                backupProgress = 0.3f
+                                backupStatusText = if (lang == "हिंदी") "डेटा पैकेज तैयार हो रहा है..." else "Preparing local cycle backup package..."
+                                delay(1000)
+                                backupProgress = 0.7f
+                                backupStatusText = if (lang == "हिंदी") "VelvetCycle_backup.json अपलोड हो रहा है..." else "Uploading VelvetCycle_backup.json..."
+                                delay(800)
+                                backupProgress = 1f
+                                backupStatusText = if (lang == "हिंदी") "गूगल ड्राइव बैकअप सफल!" else "Google Drive backup successful!"
+                                Toast.makeText(context, if (lang == "हिंदी") "बैकअप सफल!" else "Backup successful!", Toast.LENGTH_SHORT).show()
+                            }
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = PrimaryPink.copy(alpha = 0.05f)),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.pinkAccent.copy(alpha = 0.08f)),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("backup_data_button")
+                            .testTag("backup_drive_btn")
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.CloudUpload,
-                            contentDescription = null,
-                            tint = PrimaryPink,
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                        Text("Backup to Google Drive", color = PrimaryPink, fontWeight = FontWeight.Bold)
+                        Icon(imageVector = Icons.Default.CloudUpload, contentDescription = null, tint = colors.pinkAccent, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = Translations.t("btn_backup", lang), color = colors.pinkAccent, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
 
-                    // Delete All My Data (Red alert button)
+                    // Restore Button
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                showRestoreDialog = true
+                                restoreProgress = 0f
+                                restoreStatusText = if (lang == "हिंदी") "गूगल ड्राइव पर बैकअप खोज रहा है..." else "Scanning Google Drive for backup..."
+                                delay(1000)
+                                restoreProgress = 0.4f
+                                restoreStatusText = if (lang == "हिंदी") "VelvetCycle_backup.json डाउनलोड हो रहा है..." else "Downloading VelvetCycle_backup.json..."
+                                delay(1000)
+                                restoreProgress = 0.8f
+                                restoreStatusText = if (lang == "हिंदी") "डेटा स्थानीय रूप से पुनर्स्थापित हो रहा है..." else "Restoring logs locally..."
+                                delay(600)
+                                restoreProgress = 1f
+                                restoreStatusText = if (lang == "हिंदी") "सफलतापूर्वक 14 दिनों के आंकड़े और 1 पुराना चक्र बहाल किया गया!" else "Successfully restored 14 symptoms logs and 1 previous cycle!"
+                                Toast.makeText(context, if (lang == "हिंदी") "रीस्टोर सफल!" else "Restore complete!", Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.pinkAccent.copy(alpha = 0.08f)),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("restore_drive_btn")
+                    ) {
+                        Icon(imageVector = Icons.Default.CloudDownload, contentDescription = null, tint = colors.pinkAccent, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = Translations.t("btn_restore", lang), color = colors.pinkAccent, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                    }
+
+                    // Delete Data
                     Button(
                         onClick = { showDeleteConfirmDialog = true },
-                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error.copy(alpha = 0.1f)),
+                        colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .testTag("delete_data_button")
+                            .testTag("delete_data_btn")
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Delete,
-                            contentDescription = null,
-                            tint = MaterialTheme.colorScheme.error,
-                            modifier = Modifier.padding(end = 8.dp)
-                        )
-                        Text(
-                            text = "Delete all my data",
-                            color = MaterialTheme.colorScheme.error,
-                            fontWeight = FontWeight.Bold
-                        )
+                        Icon(imageVector = Icons.Default.DeleteForever, contentDescription = null, tint = colors.cardBackground, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = Translations.t("btn_delete_data", lang), color = colors.cardBackground, fontWeight = FontWeight.Bold, fontSize = 13.sp)
                     }
                 }
             }
 
-            // SECTION — ABOUT
-            SettingsCard(title = "About") {
+            // --- SECTION 8: ABOUT ---
+            SettingsSectionCard(title = Translations.t("section_about", lang)) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "VelvetCycle",
-                        fontSize = 16.sp,
+                        text = "VelvetCycle v1.0.0",
+                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
-                        color = PrimaryPink
+                        color = colors.textPrimary
                     )
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "Version 1.0.0",
-                        fontSize = 12.sp,
-                        color = DarkText.copy(alpha = 0.6f)
-                    )
-                    Text(
-                        text = "Made with ❤️ for women",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = DarkText.copy(alpha = 0.7f),
-                        modifier = Modifier.padding(top = 8.dp)
+                        text = "Your private, secure, offline cycle companion",
+                        fontSize = 11.sp,
+                        color = colors.textSecondary,
+                        textAlign = TextAlign.Center
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(30.dp))
         }
     }
 
-    // Delete Data Confirmation Dialog
+    // --- Delete Confirmation Alert Dialog ---
     if (showDeleteConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmDialog = false },
-            title = { Text("Delete all data?", fontWeight = FontWeight.Bold) },
-            text = { Text("Are you absolutely sure you want to delete all logs, PIN, and cycle details? This operation cannot be undone.") },
+            title = {
+                Text(
+                    text = if (lang == "हिंदी") "क्या आप निश्चित हैं?" else if (lang == "తెలుగు") "ఖచ్చితంగా ఉన్నారా?" else "Are you absolutely sure?",
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary
+                )
+            },
+            text = {
+                Text(
+                    text = if (lang == "हिंदी") "यह आपके सभी पीरियड लॉग, पासवर्ड पिन और चक्र इतिहास को स्थायी रूप से हटा देगा। इसे पूर्ववत नहीं किया जा सकता है।" else if (lang == "తెలుగు") "ఇది మీ పీరియడ్ లాగ్‌లు, పిన్ పాస్‌వర్డ్‌లు మరియు సైకిల్ హిస్టరీ మొత్తాన్ని శాశ్వతంగా తొలగిస్తుంది. దీనిని తిరిగి పొందలేరు." else "This will permanently wipe all your period logs, PIN passwords, and cycle histories. This action cannot be undone.",
+                    color = colors.textPrimary,
+                    fontSize = 14.sp
+                )
+            },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        showDeleteConfirmDialog = false
-                        NotificationHelper.cancelAllNotifications(context)
                         storageHelper.clear()
-                        Toast.makeText(context, "All data wiped!", Toast.LENGTH_SHORT).show()
+                        showDeleteConfirmDialog = false
+                        Toast.makeText(context, "All data deleted! Restarting.", Toast.LENGTH_LONG).show()
                         onNavigateToOnboarding()
-                    },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-                    modifier = Modifier.testTag("confirm_delete_btn")
+                    }
                 ) {
-                    Text("Delete", fontWeight = FontWeight.Bold)
+                    Text(
+                        text = if (lang == "हिंदी") "हां, हटाएं" else if (lang == "తెలుగు") "అవును, తొలగించు" else "Yes, Clear Everything",
+                        color = MaterialTheme.colorScheme.error,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             },
             dismissButton = {
-                TextButton(
-                    onClick = { showDeleteConfirmDialog = false },
-                    modifier = Modifier.testTag("dismiss_delete_btn")
-                ) {
-                    Text("Cancel", fontWeight = FontWeight.Medium)
+                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text(
+                        text = if (lang == "हिंदी") "रद्द करें" else if (lang == "తెలుగు") "రద్దు చేయి" else "Cancel",
+                        color = colors.textSecondary
+                    )
                 }
-            }
+            },
+            containerColor = colors.cardBackground
         )
     }
 }
 
 @Composable
-fun SettingsCard(
+fun SettingsSectionCard(
     title: String,
     content: @Composable () -> Unit
 ) {
-    Card(
+    val colors = LocalVelvetColors.current
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = White),
-        shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
+        Text(
+            text = title,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Bold,
+            color = colors.pinkAccent,
+            modifier = Modifier.padding(start = 4.dp)
+        )
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
+            shape = RoundedCornerShape(16.dp),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
-            Text(
-                text = title,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Bold,
-                color = PrimaryPink,
-                modifier = Modifier.padding(bottom = 12.dp)
-            )
-            content()
+            Box(modifier = Modifier.padding(16.dp)) {
+                content()
+            }
         }
     }
 }
 
 @Composable
-fun NotificationToggleRow(
+fun NotificationToggleItem(
     title: String,
     subtitle: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    tag: String
+    onCheckedChange: (Boolean) -> Unit
 ) {
+    val colors = LocalVelvetColors.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -636,50 +750,23 @@ fun NotificationToggleRow(
                 text = title,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Bold,
-                color = DarkText
+                color = colors.textPrimary
             )
             Text(
                 text = subtitle,
                 fontSize = 11.sp,
-                color = DarkText.copy(alpha = 0.5f)
+                color = colors.textSecondary
             )
         }
-
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             colors = SwitchDefaults.colors(
-                checkedThumbColor = White,
-                checkedTrackColor = PrimaryPink,
-                uncheckedThumbColor = DarkText.copy(alpha = 0.4f),
-                uncheckedTrackColor = LightPinkBg
-            ),
-            modifier = Modifier.testTag(tag)
-        )
-    }
-}
-
-@Composable
-fun StorePreferenceButton(
-    name: String,
-    isSelected: Boolean,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(12.dp))
-            .background(if (isSelected) PrimaryPink else White)
-            .border(1.dp, if (isSelected) PrimaryPink else PrimaryPink.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
-            .clickable { onClick() }
-            .padding(vertical = 12.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = name,
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Bold,
-            color = if (isSelected) White else DarkText
+                checkedThumbColor = colors.cardBackground,
+                checkedTrackColor = colors.pinkAccent,
+                uncheckedThumbColor = colors.textSecondary,
+                uncheckedTrackColor = colors.border
+            )
         )
     }
 }

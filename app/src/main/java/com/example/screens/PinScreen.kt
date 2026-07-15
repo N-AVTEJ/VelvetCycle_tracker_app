@@ -18,7 +18,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -27,10 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
-import com.example.ui.theme.DarkText
-import com.example.ui.theme.LightPinkBg
-import com.example.ui.theme.PrimaryPink
-import com.example.ui.theme.White
+import com.example.LocalAppLanguage
+import com.example.ui.theme.LocalVelvetColors
 import com.example.utils.StorageHelper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -49,6 +46,8 @@ fun PinScreen(
     onSetupComplete: () -> Unit = {},
     onCancelSetup: (() -> Unit)? = null
 ) {
+    val colors = LocalVelvetColors.current
+    val lang = LocalAppLanguage.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     
@@ -58,7 +57,7 @@ fun PinScreen(
     var isShaking by remember { mutableStateOf(false) }
     var lockoutTimeLeft by remember { mutableStateOf(storageHelper.getLockoutTimeRemaining()) }
 
-    // Lockout timer polling
+    // Lockout countdown loop
     LaunchedEffect(key1 = lockoutTimeLeft) {
         if (lockoutTimeLeft > 0) {
             while (lockoutTimeLeft > 0) {
@@ -69,7 +68,7 @@ fun PinScreen(
         }
     }
 
-    // Shake animation offset
+    // Shake animation
     val shakeOffset by animateFloatAsState(
         targetValue = if (isShaking) 15f else 0f,
         animationSpec = keyframes {
@@ -86,7 +85,7 @@ fun PinScreen(
         label = "shake"
     )
 
-    // Trigger Android System Biometric Prompt
+    // Biometric prompt action
     val triggerBiometricAuth = {
         val activity = context as? FragmentActivity
         if (activity != null && storageHelper.biometricEnabled && currentMode == PinMode.Verify) {
@@ -97,7 +96,6 @@ fun PinScreen(
                 object : BiometricPrompt.AuthenticationCallback() {
                     override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
                         super.onAuthenticationError(errorCode, errString)
-                        // Ignore general cancels, but log others
                     }
 
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
@@ -108,47 +106,53 @@ fun PinScreen(
 
                     override fun onAuthenticationFailed() {
                         super.onAuthenticationFailed()
-                        Toast.makeText(context, "Authentication failed", Toast.LENGTH_SHORT).show()
+                        val failedMsg = if (lang == "हिंदी") "सत्यापन विफल रहा" else if (lang == "తెలుగు") "ధృవీకరణ విఫలమైంది" else "Authentication failed"
+                        Toast.makeText(context, failedMsg, Toast.LENGTH_SHORT).show()
                     }
                 }
             )
 
+            val promptTitle = if (lang == "हिंदी") "VelvetCycle को अनलॉक करें" else if (lang == "తెలుగు") "VelvetCycle అన్‌లాక్ చేయండి" else "Unlock VelvetCycle"
+            val promptSubtitle = if (lang == "हिंदी") "अनलॉक करने के लिए अपनी उंगली या चेहरे का उपयोग करें" else if (lang == "తెలుగు") "అన్‌లాక్ చేయడానికి వేలిముద్ర లేదా ఫేస్ లాక్ ఉపయోగించండి" else "Use your fingerprint or face to authenticate"
+            val promptNegative = if (lang == "हिंदी") "पिन का उपयोग करें" else if (lang == "తెలుగు") "పిన్ ఉపయోగించండి" else "Use PIN"
+
             val promptInfo = BiometricPrompt.PromptInfo.Builder()
-                .setTitle("Unlock VelvetCycle")
-                .setSubtitle("Use your fingerprint or face to authenticate")
-                .setNegativeButtonText("Use PIN")
+                .setTitle(promptTitle)
+                .setSubtitle(promptSubtitle)
+                .setNegativeButtonText(promptNegative)
                 .build()
 
             biometricPrompt.authenticate(promptInfo)
         }
     }
 
-    // Auto-launch biometric prompt on start if Verify mode and enabled
+    // Auto-authenticate on verify start
     LaunchedEffect(key1 = currentMode) {
         if (currentMode == PinMode.Verify && storageHelper.biometricEnabled) {
-            delay(300) // slight delay to let Compose render
+            delay(350)
             triggerBiometricAuth()
         }
     }
 
-    // Check if biometric sensor is available on device
+    // Sensor capability check
     val isBiometricHardwareAvailable = remember {
         val biometricManager = BiometricManager.from(context)
         val canAuth = biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG)
         canAuth == BiometricManager.BIOMETRIC_SUCCESS
     }
 
-    // Handles digit key taps
+    // Numpad key input
     val onDigitPressed: (String) -> Unit = { digit ->
         if (lockoutTimeLeft > 0) {
-            errorMessage = "Try again in ${Math.ceil(lockoutTimeLeft / 1000.0 / 60.0).toInt()} minutes"
+            val minutesLeft = Math.ceil(lockoutTimeLeft / 1000.0 / 60.0).toInt()
+            errorMessage = if (lang == "हिंदी") "${minutesLeft} मिनट बाद पुनः प्रयास करें" else if (lang == "తెలుగు") "${minutesLeft} నిమిషాల తర్వాత ప్రయత్నించండి" else "Try again in $minutesLeft minutes"
         } else if (enteredDigits.length < 4) {
             enteredDigits += digit
             errorMessage = ""
 
             if (enteredDigits.length == 4) {
                 scope.launch {
-                    delay(150) // let the last dot fill before validating
+                    delay(150)
                     val pin = enteredDigits
                     enteredDigits = ""
 
@@ -164,24 +168,26 @@ fun PinScreen(
                                 if (attempts >= 5) {
                                     storageHelper.setLockout()
                                     lockoutTimeLeft = storageHelper.getLockoutTimeRemaining()
-                                    errorMessage = "Too many wrong attempts. Locked for 5 minutes."
+                                    errorMessage = if (lang == "हिंदी") "अत्यधिक गलत प्रयास। 5 मिनट के लिए अवरुद्ध।" else if (lang == "తెలుగు") "ఎక్కువ సార్లు తప్పుగా టైప్ చేసారు. 5 నిమిషాలు లాక్ చేయబడింది." else "Too many wrong attempts. Locked for 5 minutes."
                                 } else {
-                                    errorMessage = "Incorrect PIN. ${5 - attempts} attempts remaining."
+                                    val remaining = 5 - attempts
+                                    errorMessage = if (lang == "हिंदी") "गलत पिन। ${remaining} प्रयास शेष।" else if (lang == "తెలుగు") "తప్పు పిన్. ఇంకా ${remaining} సార్లు మాత్రమే అవకాశం ఉంది." else "Incorrect PIN. $remaining attempts remaining."
                                 }
                                 isShaking = true
                             }
                         }
                         is PinMode.Setup -> {
                             currentMode = PinMode.Confirm(pin)
-                            errorMessage = "Confirm your 4-digit PIN"
+                            errorMessage = if (lang == "हिंदी") "अपने 4-अंकीय पिन की पुष्टि करें" else if (lang == "తెలుగు") "మీ 4-అంకెల పిన్‌ని నిర్ధారించండి" else "Confirm your 4-digit PIN"
                         }
                         is PinMode.Confirm -> {
                             if (mode.firstPin == pin) {
                                 storageHelper.userPin = pin
-                                Toast.makeText(context, "PIN Saved Successfully!", Toast.LENGTH_SHORT).show()
+                                val savedSuccessMsg = if (lang == "हिंदी") "पिन सफलतापूर्वक सहेजा गया!" else if (lang == "తెలుగు") "పిన్ విజయవంతంగా సేవ్ చేయబడింది!" else "PIN Saved Successfully!"
+                                Toast.makeText(context, savedSuccessMsg, Toast.LENGTH_SHORT).show()
                                 onSetupComplete()
                             } else {
-                                errorMessage = "PINs did not match. Start over."
+                                errorMessage = if (lang == "हिंदी") "पिन मेल नहीं खाए। फिर से शुरू करें।" else if (lang == "తెలుగు") "పిన్ మ్యాచ్ కాలేదు. మళ్లీ మొదలు పెట్టండి." else "PINs did not match. Start over."
                                 isShaking = true
                                 delay(1000)
                                 currentMode = PinMode.Setup
@@ -200,16 +206,24 @@ fun PinScreen(
         }
     }
 
-    // Screen layout
+    val subTitleLabel = if (lang == "हिंदी") "आपका सुरक्षित चक्र साथी" else if (lang == "తెలుగు") "మీ సురక్షిత సైకిల్ గైడ్" else "YOUR INTIMATE HEALTH PARTNER"
+
+    val instructions = when (currentMode) {
+        is PinMode.Verify -> if (lang == "हिंदी") "अनलॉक करने के लिए पिन दर्ज करें" else if (lang == "తెలుగు") "అన్‌లాక్ చేయడానికి పిన్ నమోదు చేయండి" else "Enter PIN to unlock"
+        is PinMode.Setup -> if (lang == "हिंदी") "एक सुरक्षित 4-अंकीय पिन सेट करें" else if (lang == "తెలుగు") "సురक्षితమైన 4-అంకెల పిన్ సెట్ చేయండి" else "Set a secure 4-digit PIN"
+        is PinMode.Confirm -> if (lang == "हिंदी") "पुष्टि करने के लिए फिर से पिन दर्ज करें" else if (lang == "తెలుగు") "ధృవీకరించడానికి పిన్‌ను మళ్లీ నమోదు చేయండి" else "Re-enter PIN to confirm"
+    }
+
+    // Screen Layout
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(LightPinkBg)
+            .background(colors.background)
             .padding(24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Top section with logo & instructions
+        // Logo and Title Area
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(top = 40.dp)
@@ -218,35 +232,29 @@ fun PinScreen(
                 text = "VelvetCycle",
                 fontSize = 32.sp,
                 fontWeight = FontWeight.Bold,
-                color = PrimaryPink,
+                color = colors.pinkAccent,
                 textAlign = TextAlign.Center,
                 letterSpacing = 1.sp
             )
             
             Text(
-                text = "YOUR INTIMATE HEALTH PARTNER",
-                fontSize = 10.sp,
+                text = subTitleLabel,
+                fontSize = 11.sp,
                 fontWeight = FontWeight.Bold,
-                color = DarkText.copy(alpha = 0.5f),
+                color = colors.textSecondary,
                 letterSpacing = 2.sp,
                 modifier = Modifier.padding(top = 4.dp, bottom = 32.dp)
             )
 
-            val instructions = when (currentMode) {
-                is PinMode.Verify -> "Enter PIN to unlock"
-                is PinMode.Setup -> "Set a secure 4-digit PIN"
-                is PinMode.Confirm -> "Re-enter PIN to confirm"
-            }
-            
             Text(
                 text = instructions,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = DarkText,
+                color = colors.textPrimary,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
-            // 4 Dot Indicators
+            // Dynamic Dot Indicators
             Row(
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -261,13 +269,13 @@ fun PinScreen(
                         modifier = Modifier
                             .size(16.dp)
                             .clip(CircleShape)
-                            .background(if (isFilled) PrimaryPink else DarkText.copy(alpha = 0.2f))
+                            .background(if (isFilled) colors.pinkAccent else colors.textSecondary.copy(alpha = 0.3f))
                             .testTag("pin_dot_$i")
                     )
                 }
             }
 
-            // Error Message
+            // Error Display Label
             if (errorMessage.isNotEmpty()) {
                 Text(
                     text = errorMessage,
@@ -282,7 +290,7 @@ fun PinScreen(
             }
         }
 
-        // Numpad Keys section
+        // Numpad Column Layout
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.padding(bottom = 24.dp)
@@ -304,18 +312,18 @@ fun PinScreen(
                 }
             }
 
-            // Last row: Biometrics, 0, Backspace
+            // Bottom row containing biometric trigger, 0, and backspace
             Row(
                 horizontalArrangement = Arrangement.spacedBy(24.dp),
                 modifier = Modifier.padding(vertical = 8.dp)
             ) {
-                // Biometrics Button
+                // Biometrics activation button
                 if (currentMode == PinMode.Verify && storageHelper.biometricEnabled && isBiometricHardwareAvailable) {
                     Box(
                         modifier = Modifier
                             .size(72.dp)
                             .clip(CircleShape)
-                            .background(PrimaryPink.copy(alpha = 0.1f))
+                            .background(colors.pinkAccent.copy(alpha = 0.1f))
                             .clickable { triggerBiometricAuth() }
                             .testTag("pin_btn_biometric"),
                         contentAlignment = Alignment.Center
@@ -323,18 +331,17 @@ fun PinScreen(
                         Icon(
                             imageVector = Icons.Default.Fingerprint,
                             contentDescription = "Fingerprint",
-                            tint = PrimaryPink,
+                            tint = colors.pinkAccent,
                             modifier = Modifier.size(28.dp)
                         )
                     }
                 } else {
-                    // Blank spacer to maintain grid alignment
                     Spacer(modifier = Modifier.size(72.dp))
                 }
 
                 NumpadButton("0", onClick = { onDigitPressed("0") })
 
-                // Backspace Button
+                // Backspace button
                 Box(
                     modifier = Modifier
                         .size(72.dp)
@@ -346,22 +353,23 @@ fun PinScreen(
                     Icon(
                         imageVector = Icons.Default.Backspace,
                         contentDescription = "Backspace",
-                        tint = DarkText.copy(alpha = 0.8f),
+                        tint = colors.textPrimary,
                         modifier = Modifier.size(24.dp)
                     )
                 }
             }
 
-            // Cancel Button for Setup mode
+            // Cancel trigger for security settings onboarding
             if (onCancelSetup != null && (currentMode is PinMode.Setup || currentMode is PinMode.Confirm)) {
                 Spacer(modifier = Modifier.height(16.dp))
+                val cancelSetupLabel = if (lang == "हिंदी") "सेटअप रद्द करें" else if (lang == "తెలుగు") "సెటప్ రద్దు చేయి" else "Cancel Setup"
                 TextButton(
                     onClick = onCancelSetup,
                     modifier = Modifier.testTag("pin_cancel_setup_button")
                 ) {
                     Text(
-                        text = "Cancel Setup",
-                        color = PrimaryPink,
+                        text = cancelSetupLabel,
+                        color = colors.pinkAccent,
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp
                     )
@@ -376,11 +384,12 @@ fun NumpadButton(
     digit: String,
     onClick: () -> Unit
 ) {
+    val colors = LocalVelvetColors.current
     Box(
         modifier = Modifier
             .size(72.dp)
             .clip(CircleShape)
-            .background(White)
+            .background(colors.cardBackground)
             .clickable { onClick() }
             .testTag("pin_btn_$digit"),
         contentAlignment = Alignment.Center
@@ -389,7 +398,7 @@ fun NumpadButton(
             text = digit,
             fontSize = 24.sp,
             fontWeight = FontWeight.Bold,
-            color = DarkText
+            color = colors.textPrimary
         )
     }
 }

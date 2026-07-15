@@ -4,16 +4,14 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -24,7 +22,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.ui.theme.*
+import com.example.LocalAppLanguage
+import com.example.constants.Translations
+import com.example.ui.theme.FertileGreen
+import com.example.ui.theme.LocalVelvetColors
+import com.example.ui.theme.SecondaryPink
+import com.example.ui.theme.Teal
 import com.example.utils.StorageHelper
 import java.time.LocalDate
 import java.time.YearMonth
@@ -36,6 +39,9 @@ import java.time.temporal.ChronoUnit
 fun CalendarScreen(
     storageHelper: StorageHelper
 ) {
+    val colors = LocalVelvetColors.current
+    val lang = LocalAppLanguage.current
+    
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
     var selectedDate by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
 
@@ -44,21 +50,27 @@ fun CalendarScreen(
     val periodDuration = storageHelper.periodDuration
 
     val today = LocalDate.now()
-    val monthYearFormatter = remember { DateTimeFormatter.ofPattern("MMMM yyyy") }
-    val detailsDateFormatter = remember { DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy") }
 
-    // Calendar grid calculations
+    // Header values
+    val calendarHeaderLabel = if (lang == "हिंदी") "चक्र कैलेंडर" else if (lang == "తెలుగు") "చక్ర క్యాలెండర్" else "Cycle Calendar"
+
+    // Formatters
+    val monthYearText = if (lang == "हिंदी" || lang == "తెలుగు") {
+        val monthName = Translations.getMonthName(currentMonth.monthValue, lang)
+        "$monthName ${currentMonth.year}"
+    } else {
+        currentMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy"))
+    }
+
+    // Grid details
     val firstDayOfMonth = currentMonth.atDay(1)
     val daysInMonth = currentMonth.lengthOfMonth()
-    
-    // DayOfWeek: 1 = Monday, 7 = Sunday.
-    // Shift is the number of empty slots needed at the start of the grid (using Monday-start).
-    val startShift = firstDayOfMonth.dayOfWeek.value - 1
+    val startShift = firstDayOfMonth.dayOfWeek.value - 1 // Monday-start shifts
 
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(LightPinkBg)
+            .background(colors.background)
             .verticalScroll(rememberScrollState())
             .padding(16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -74,15 +86,15 @@ fun CalendarScreen(
         ) {
             Icon(
                 imageVector = Icons.Default.CalendarMonth,
-                contentDescription = "Calendar Icon",
-                tint = PrimaryPink,
+                contentDescription = null,
+                tint = colors.pinkAccent,
                 modifier = Modifier.size(28.dp)
             )
             Text(
-                text = "Cycle Calendar",
+                text = calendarHeaderLabel,
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = DarkText
+                color = colors.textPrimary
             )
         }
 
@@ -91,39 +103,43 @@ fun CalendarScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("calendar_grid_card"),
-            colors = CardDefaults.cardColors(containerColor = White),
+            colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
             shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(16.dp)
             ) {
-                // Month Selector Header
+                // Month Selector
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = { currentMonth = currentMonth.minusMonths(1) }) {
-                        Icon(imageVector = Icons.Default.ChevronLeft, contentDescription = "Previous Month", tint = PrimaryPink)
+                        Icon(imageVector = Icons.Default.ChevronLeft, contentDescription = "Previous Month", tint = colors.pinkAccent)
                     }
                     Text(
-                        text = currentMonth.format(monthYearFormatter),
+                        text = monthYearText,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
-                        color = DarkText
+                        color = colors.textPrimary
                     )
                     IconButton(onClick = { currentMonth = currentMonth.plusMonths(1) }) {
-                        Icon(imageVector = Icons.Default.ChevronRight, contentDescription = "Next Month", tint = PrimaryPink)
+                        Icon(imageVector = Icons.Default.ChevronRight, contentDescription = "Next Month", tint = colors.pinkAccent)
                     }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // Weekday Row
-                val weekdays = listOf("M", "T", "W", "T", "F", "S", "S")
+                // Weekday initials
+                val weekdays = when (lang) {
+                    "हिंदी" -> listOf("सोम", "मं", "बुध", "गु", "शु", "श", "र")
+                    "తెలుగు" -> listOf("సోమ", "మం", "బుధ", "గురు", "శుక్ర", "శని", "ఆది")
+                    else -> listOf("M", "T", "W", "T", "F", "S", "S")
+                }
                 Row(modifier = Modifier.fillMaxWidth()) {
                     weekdays.forEach { day ->
                         Text(
@@ -132,14 +148,14 @@ fun CalendarScreen(
                             textAlign = TextAlign.Center,
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = GrayText
+                            color = colors.textSecondary
                         )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // Days Grid (Using standard Column + Row layout for maximum reliability and exact cell sizing)
+                // Days Grid
                 val totalSlots = startShift + daysInMonth
                 val rows = (totalSlots + 6) / 7
 
@@ -163,11 +179,10 @@ fun CalendarScreen(
                                 val isToday = date == today
                                 val isSelected = date == selectedDate
 
-                                // Cell background color
                                 val cellBgColor = when {
-                                    isPeriod -> SecondaryPink // Pink background (#F4C0D1)
-                                    isFertile -> FertileGreen // Green background (#C8EEDD)
-                                    else -> White
+                                    isPeriod -> SecondaryPink
+                                    isFertile -> FertileGreen
+                                    else -> colors.cardBackground
                                 }
 
                                 Box(
@@ -179,7 +194,7 @@ fun CalendarScreen(
                                         .background(cellBgColor)
                                         .border(
                                             width = if (isToday) 2.dp else if (isSelected) 1.dp else 0.dp,
-                                            color = if (isToday) DarkText else if (isSelected) PrimaryPink.copy(alpha = 0.5f) else androidx.compose.ui.graphics.Color.Transparent,
+                                            color = if (isToday) colors.textPrimary else if (isSelected) colors.pinkAccent.copy(alpha = 0.5f) else androidx.compose.ui.graphics.Color.Transparent,
                                             shape = RoundedCornerShape(10.dp)
                                         )
                                         .clickable { selectedDate = date },
@@ -193,23 +208,21 @@ fun CalendarScreen(
                                             text = dayOfMonth.toString(),
                                             fontSize = 14.sp,
                                             fontWeight = if (isToday || isSelected) FontWeight.Bold else FontWeight.Medium,
-                                            color = if (isPeriod && isSelected) PrimaryPink else DarkText
+                                            color = if (isPeriod && isSelected) colors.pinkAccent else colors.textPrimary
                                         )
                                         
-                                        // Ovulation dot
                                         if (isOvulation) {
                                             Spacer(modifier = Modifier.height(2.dp))
                                             Box(
                                                 modifier = Modifier
                                                     .size(5.dp)
                                                     .clip(CircleShape)
-                                                    .background(Teal) // Teal dot (#4ECDC4)
+                                                    .background(Teal)
                                             )
                                         }
                                     }
                                 }
                             } else {
-                                // Empty spacer cell for offset padding
                                 Box(modifier = Modifier.weight(1f).aspectRatio(1f))
                             }
                         }
@@ -218,31 +231,31 @@ fun CalendarScreen(
             }
         }
 
-        // Details Panel Card
+        // Selected Day Details Panel
         selectedDate?.let { date ->
             val isPeriod = isPeriodDay(date, lastPeriodStart, cycleLength, periodDuration)
             val isFertile = isFertileDay(date, lastPeriodStart, cycleLength)
             val isOvulation = isOvulationDay(date, lastPeriodStart, cycleLength)
 
             val statusTitle = when {
-                isPeriod -> "Period Day"
-                isOvulation -> "Ovulation Day"
-                isFertile -> "Fertility Window"
-                else -> "Regular Day"
+                isPeriod -> if (lang == "हिंदी") "मासिक धर्म का दिन" else if (lang == "తెలుగు") "పీరియడ్ రోజు" else "Period Day"
+                isOvulation -> if (lang == "हिंदी") "डिंबोत्सर्जन दिवस" else if (lang == "తెలుగు") "అండవిడుదల రోజు" else "Ovulation Day"
+                isFertile -> if (lang == "हिंदी") "उर्वर अवधि (Fertility)" else if (lang == "తెలుగు") "సంతానోత్పత్తి సమయం" else "Fertile Window"
+                else -> if (lang == "हिंदी") "सामान्य दिन" else if (lang == "తెలుగు") "సాధారణ రోజు" else "Regular Day"
             }
 
             val statusColor = when {
-                isPeriod -> PrimaryPink
+                isPeriod -> colors.pinkAccent
                 isOvulation -> Teal
-                isFertile -> DarkText
-                else -> GrayText
+                isFertile -> colors.textPrimary
+                else -> colors.textSecondary
             }
 
             val statusDescription = when {
-                isPeriod -> "Expected menstrual phase. Rest and hydrate well."
-                isOvulation -> "Egg release peak! Conception chances are very high."
-                isFertile -> "Favorable time for conception. General wellness."
-                else -> "Low chances of conception. Normal cycle day."
+                isPeriod -> if (lang == "हिंदी") "मासिक धर्म चरण। पर्याप्त विश्राम और गर्म पानी पिएं।" else if (lang == "తెలుగు") "పీరియడ్ సమయం. తగినంత విశ్రాంతి తీసుకోండి." else "Expected menstrual phase. Rest and hydrate well."
+                isOvulation -> if (lang == "हिंदी") "अंडा जारी होने का चरम! गर्भधारण की संभावना सबसे अधिक।" else if (lang == "తెలుగు") "అండవిడుదల సమయం! గర్భం దాల్చడానికి ఎక్కువ అవకాశాలు ఉన్నాయి." else "Egg release peak! Conception chances are very high."
+                isFertile -> if (lang == "हिंदी") "गर्भधारण के लिए अनुकूल समय। स्वस्थ रहें।" else if (lang == "తెలుగు") "గర్భం దాల్చడానికి అనుకూల సమయం. ఆరోగ్యం పట్ల శ్రద్ధ వహించండి." else "Favorable time for conception. General wellness."
+                else -> if (lang == "हिंदी") "गर्भधारण की कम संभावना। सामान्य चक्र दिवस।" else if (lang == "తెలుగు") "గర్భం దాల్చడానికి తక్కువ అవకాశాలు ఉన్నాయి. సాధారణ చక్రం రోజు." else "Low chances of conception. Normal cycle day."
             }
 
             val log = storageHelper.getLog(date.toString())
@@ -251,9 +264,9 @@ fun CalendarScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("date_details_card"),
-                colors = CardDefaults.cardColors(containerColor = White),
+                colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
                 shape = RoundedCornerShape(16.dp),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
                 Column(
                     modifier = Modifier
@@ -261,10 +274,10 @@ fun CalendarScreen(
                         .padding(16.dp)
                 ) {
                     Text(
-                        text = date.format(detailsDateFormatter),
+                        text = Translations.formatDate(date, lang),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.SemiBold,
-                        color = GrayText
+                        color = colors.textSecondary
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     
@@ -278,10 +291,10 @@ fun CalendarScreen(
                                 .clip(CircleShape)
                                 .background(
                                     when {
-                                        isPeriod -> PrimaryPink
+                                        isPeriod -> colors.pinkAccent
                                         isOvulation -> Teal
                                         isFertile -> FertileGreen
-                                        else -> BorderColor
+                                        else -> colors.border
                                     }
                                 )
                         )
@@ -297,19 +310,20 @@ fun CalendarScreen(
                     Text(
                         text = statusDescription,
                         fontSize = 13.sp,
-                        color = DarkText.copy(alpha = 0.7f)
+                        color = colors.textSecondary,
+                        lineHeight = 18.sp
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
-                    Divider(color = LightPinkBg, thickness = 1.dp)
+                    Divider(color = colors.border, thickness = 0.5.dp)
                     Spacer(modifier = Modifier.height(16.dp))
 
                     if (log != null) {
                         Text(
-                            text = "Daily Log",
+                            text = Translations.t("log_today", lang),
                             fontSize = 14.sp,
                             fontWeight = FontWeight.Bold,
-                            color = PrimaryPink,
+                            color = colors.pinkAccent,
                             modifier = Modifier.padding(bottom = 12.dp)
                         )
                         
@@ -322,7 +336,7 @@ fun CalendarScreen(
                                 Box(
                                     modifier = Modifier
                                         .clip(RoundedCornerShape(12.dp))
-                                        .background(LightPinkBg)
+                                        .background(colors.background)
                                         .padding(10.dp),
                                     contentAlignment = Alignment.Center
                                 ) {
@@ -332,26 +346,33 @@ fun CalendarScreen(
                             
                             Column {
                                 Text(
-                                    text = "Flow Intensity",
+                                    text = Translations.t("flow_today", lang),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = GrayText
+                                    color = colors.textSecondary
                                 )
+                                val flowLabel = when (log.flow.lowercase().trim()) {
+                                    "spotting" -> Translations.t("flow_spotting", lang)
+                                    "light" -> Translations.t("flow_light", lang)
+                                    "medium" -> Translations.t("flow_medium", lang)
+                                    "heavy" -> Translations.t("flow_heavy", lang)
+                                    else -> Translations.t("flow_none", lang)
+                                }
                                 Text(
-                                    text = log.flow.ifEmpty { "None" },
+                                    text = flowLabel,
                                     fontSize = 14.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = DarkText
+                                    color = colors.textPrimary
                                 )
                             }
                         }
                         
                         if (log.symptoms.isNotEmpty()) {
                             Text(
-                                text = "Symptoms",
+                                text = Translations.t("symptoms", lang),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = GrayText,
+                                color = colors.textSecondary,
                                 modifier = Modifier.padding(bottom = 6.dp)
                             )
                             FlowRow(
@@ -360,14 +381,27 @@ fun CalendarScreen(
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 log.symptoms.forEach { symptom ->
+                                    val translatedSymptom = when (symptom.lowercase().trim()) {
+                                        "cramps" -> Translations.t("sym_cramps", lang)
+                                        "headache" -> Translations.t("sym_headache", lang)
+                                        "bloating" -> Translations.t("sym_bloating", lang)
+                                        "acne" -> Translations.t("sym_acne", lang)
+                                        "fatigue" -> Translations.t("sym_fatigue", lang)
+                                        "mood swings" -> Translations.t("sym_mood_swings", lang)
+                                        "backache" -> Translations.t("sym_backache", lang)
+                                        "breast tenderness" -> Translations.t("sym_breast_tenderness", lang)
+                                        "cravings" -> Translations.t("sym_cravings", lang)
+                                        "nausea" -> Translations.t("sym_nausea", lang)
+                                        else -> symptom
+                                    }
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(12.dp))
-                                            .background(PrimaryPink.copy(alpha = 0.08f))
-                                            .border(1.dp, PrimaryPink.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                                            .background(colors.pinkAccent.copy(alpha = 0.08f))
+                                            .border(1.dp, colors.pinkAccent.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
                                             .padding(horizontal = 10.dp, vertical = 4.dp)
                                     ) {
-                                        Text(symptom, fontSize = 11.sp, color = PrimaryPink, fontWeight = FontWeight.Medium)
+                                        Text(translatedSymptom, fontSize = 11.sp, color = colors.pinkAccent, fontWeight = FontWeight.Medium)
                                     }
                                 }
                             }
@@ -375,24 +409,24 @@ fun CalendarScreen(
                         
                         if (log.notes.isNotEmpty()) {
                             Text(
-                                text = "Notes",
+                                text = Translations.t("notes", lang),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = GrayText,
+                                color = colors.textSecondary,
                                 modifier = Modifier.padding(bottom = 4.dp)
                             )
                             Text(
                                 text = log.notes,
                                 fontSize = 13.sp,
-                                color = DarkText.copy(alpha = 0.8f),
+                                color = colors.textPrimary,
                                 lineHeight = 18.sp
                             )
                         }
                     } else {
                         Text(
-                            text = "No log for this day.",
+                            text = if (lang == "हिंदी") "इस दिन के लिए कोई रिकॉर्ड नहीं है।" else if (lang == "తెలుగు") "ఈ రోజు కోసం లాగ్స్ లేవు." else "No log for this day.",
                             fontSize = 13.sp,
-                            color = GrayText,
+                            color = colors.textSecondary,
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.testTag("no_log_text")
                         )
@@ -403,7 +437,6 @@ fun CalendarScreen(
     }
 }
 
-// Projection-safe functions to determine status for any date
 private fun isPeriodDay(date: LocalDate, lastPeriodStart: LocalDate, cycleLength: Int, periodDuration: Int): Boolean {
     val daysBetween = ChronoUnit.DAYS.between(lastPeriodStart, date)
     val mod = if (daysBetween >= 0) {

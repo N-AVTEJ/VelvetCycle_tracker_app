@@ -3,12 +3,20 @@ package com.example.utils
 import android.content.Context
 import android.content.SharedPreferences
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 data class LogData(
     val mood: String,
     val flow: String,
     val symptoms: List<String>,
     val notes: String
+)
+
+data class CycleRecord(
+    val cycleNo: Int,
+    val startDate: LocalDate,
+    val duration: Int,
+    val notes: String = ""
 )
 
 class StorageHelper(context: Context) {
@@ -89,6 +97,64 @@ class StorageHelper(context: Context) {
         prefs.edit().clear().apply()
     }
 
+    fun getAllLogs(): Map<String, LogData> {
+        val result = mutableMapOf<String, LogData>()
+        val allPrefs = prefs.all
+        for ((key, value) in allPrefs) {
+            if (key.startsWith("log_") && value is String) {
+                val dateStr = key.substring(4)
+                val logData = getLog(dateStr)
+                if (logData != null) {
+                    result[dateStr] = logData
+                }
+            }
+        }
+        return result
+    }
+
+    fun getCycleHistory(): List<CycleRecord> {
+        val logs = getAllLogs()
+        val flowDates = logs.filter { 
+            it.value.flow == "Light" || it.value.flow == "Medium" || it.value.flow == "Heavy" 
+        }.keys.mapNotNull { 
+            try { LocalDate.parse(it) } catch (e: Exception) { null }
+        }.sorted()
+
+        val detectedPeriods = mutableListOf<LocalDate>()
+        var lastDate: LocalDate? = null
+        for (date in flowDates) {
+            if (lastDate == null || ChronoUnit.DAYS.between(lastDate, date) > 14) {
+                detectedPeriods.add(date)
+            }
+            lastDate = date
+        }
+
+        val onboardingStart = lastPeriodStart
+        if (!detectedPeriods.contains(onboardingStart)) {
+            detectedPeriods.add(onboardingStart)
+        }
+        detectedPeriods.sort()
+
+        val records = mutableListOf<CycleRecord>()
+        for (i in 0 until detectedPeriods.size) {
+            val start = detectedPeriods[i]
+            val duration = if (i < detectedPeriods.size - 1) {
+                ChronoUnit.DAYS.between(start, detectedPeriods[i + 1]).toInt()
+            } else {
+                cycleLength
+            }
+            val notesStr = logs[start.toString()]?.notes ?: ""
+            records.add(CycleRecord(
+                cycleNo = i + 1,
+                startDate = start,
+                duration = duration,
+                notes = notesStr.ifEmpty { "Regular Cycle" }
+            ))
+        }
+
+        return records.sortedByDescending { it.startDate }
+    }
+
     // Phase 3 Properties
     var userPin: String?
         get() = prefs.getString("user_pin", null)
@@ -105,6 +171,10 @@ class StorageHelper(context: Context) {
     var appLanguage: String
         get() = prefs.getString("app_language", "English") ?: "English"
         set(value) = prefs.edit().putString("app_language", value).apply()
+
+    var isDarkMode: Boolean
+        get() = prefs.getBoolean("dark_mode", false)
+        set(value) = prefs.edit().putBoolean("dark_mode", value).apply()
 
     var periodReminderEnabled: Boolean
         get() = prefs.getBoolean("notif_period_reminder", true)

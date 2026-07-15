@@ -13,32 +13,32 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.text.TextStyle
-import com.example.ui.theme.DarkText
-import com.example.ui.theme.LightPinkBg
-import com.example.ui.theme.PrimaryPink
-import com.example.ui.theme.White
+import com.example.LocalAppLanguage
+import com.example.constants.Translations
+import com.example.ui.theme.LocalVelvetColors
 import com.example.utils.LogData
 import com.example.utils.StorageHelper
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun LogScreen(storageHelper: StorageHelper) {
     val context = LocalContext.current
+    val colors = LocalVelvetColors.current
+    val lang = LocalAppLanguage.current
+
     val today = LocalDate.now()
     val todayStr = today.toString()
-    val formattedDate = today.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))
+    val formattedDate = Translations.formatDate(today, lang)
 
-    // Load existing log if available
+    // Load existing log
     val existingLog = remember(todayStr) { storageHelper.getLog(todayStr) }
 
     var selectedMood by remember { mutableStateOf(existingLog?.mood ?: "") }
@@ -51,7 +51,7 @@ fun LogScreen(storageHelper: StorageHelper) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(LightPinkBg)
+            .background(colors.background)
             .verticalScroll(scrollState)
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -61,27 +61,27 @@ fun LogScreen(storageHelper: StorageHelper) {
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
         ) {
             Text(
-                text = "Log today",
+                text = Translations.t("log_today", lang),
                 fontSize = 24.sp,
                 fontWeight = FontWeight.Bold,
-                color = DarkText
+                color = colors.textPrimary
             )
             Text(
                 text = formattedDate,
                 fontSize = 14.sp,
-                color = PrimaryPink,
+                color = colors.pinkAccent,
                 fontWeight = FontWeight.SemiBold
             )
         }
 
-        // Section 1 — How are you feeling?
+        // Section 1: How are you feeling?
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("mood_section_card"),
-            colors = CardDefaults.cardColors(containerColor = White),
+            colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
             shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -89,10 +89,10 @@ fun LogScreen(storageHelper: StorageHelper) {
                     .padding(16.dp)
             ) {
                 Text(
-                    text = "How are you feeling?",
+                    text = Translations.t("how_feeling", lang),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = DarkText,
+                    color = colors.textPrimary,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
@@ -114,7 +114,7 @@ fun LogScreen(storageHelper: StorageHelper) {
                             modifier = Modifier
                                 .size(60.dp)
                                 .clip(RoundedCornerShape(16.dp))
-                                .background(if (isSelected) PrimaryPink.copy(alpha = 0.1f) else Color.Transparent)
+                                .background(if (isSelected) colors.pinkAccent.copy(alpha = 0.1f) else androidx.compose.ui.graphics.Color.Transparent)
                                 .clickable { selectedMood = emoji }
                                 .padding(4.dp)
                                 .testTag("mood_btn_$emoji"),
@@ -122,8 +122,8 @@ fun LogScreen(storageHelper: StorageHelper) {
                         ) {
                             Surface(
                                 shape = RoundedCornerShape(12.dp),
-                                color = Color.Transparent,
-                                border = if (isSelected) BorderStroke(2.dp, PrimaryPink) else null,
+                                color = androidx.compose.ui.graphics.Color.Transparent,
+                                border = if (isSelected) BorderStroke(2.dp, colors.pinkAccent) else null,
                                 modifier = Modifier.fillMaxSize()
                             ) {
                                 Box(
@@ -142,14 +142,14 @@ fun LogScreen(storageHelper: StorageHelper) {
             }
         }
 
-        // Section 2 — Flow today
+        // Section 2: Flow intensity today
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("flow_section_card"),
-            colors = CardDefaults.cardColors(containerColor = White),
+            colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
             shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -157,10 +157,10 @@ fun LogScreen(storageHelper: StorageHelper) {
                     .padding(16.dp)
             ) {
                 Text(
-                    text = "Flow today",
+                    text = Translations.t("flow_today", lang),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = DarkText,
+                    color = colors.textPrimary,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
@@ -171,22 +171,30 @@ fun LogScreen(storageHelper: StorageHelper) {
                 ) {
                     flows.forEach { flow ->
                         val isSelected = selectedFlow == flow
+                        val translatedLabel = when (flow.lowercase().trim()) {
+                            "spotting" -> Translations.t("flow_spotting", lang)
+                            "light" -> Translations.t("flow_light", lang)
+                            "medium" -> Translations.t("flow_medium", lang)
+                            "heavy" -> Translations.t("flow_heavy", lang)
+                            else -> Translations.t("flow_none", lang)
+                        }
+
                         Button(
                             onClick = { selectedFlow = flow },
                             colors = ButtonDefaults.buttonColors(
-                                containerColor = if (isSelected) PrimaryPink else LightPinkBg,
-                                contentColor = if (isSelected) White else DarkText
+                                containerColor = if (isSelected) colors.pinkAccent else colors.background,
+                                contentColor = if (isSelected) colors.cardBackground else colors.textPrimary
                             ),
                             shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                            contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
                             modifier = Modifier
                                 .weight(1f)
                                 .height(38.dp)
                                 .testTag("flow_btn_$flow")
                         ) {
                             Text(
-                                text = flow,
-                                fontSize = 11.sp,
+                                text = translatedLabel,
+                                fontSize = 10.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 maxLines = 1
                             )
@@ -196,14 +204,14 @@ fun LogScreen(storageHelper: StorageHelper) {
             }
         }
 
-        // Section 3 — Symptoms
+        // Section 3: Symptoms
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("symptoms_section_card"),
-            colors = CardDefaults.cardColors(containerColor = White),
+            colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
             shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -211,10 +219,10 @@ fun LogScreen(storageHelper: StorageHelper) {
                     .padding(16.dp)
             ) {
                 Text(
-                    text = "Symptoms",
+                    text = Translations.t("symptoms", lang),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = DarkText,
+                    color = colors.textPrimary,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
 
@@ -230,6 +238,20 @@ fun LogScreen(storageHelper: StorageHelper) {
                 ) {
                     symptoms.forEach { symptom ->
                         val isSelected = selectedSymptoms.contains(symptom)
+                        val translatedSymptom = when (symptom.lowercase().trim()) {
+                            "cramps" -> Translations.t("sym_cramps", lang)
+                            "headache" -> Translations.t("sym_headache", lang)
+                            "bloating" -> Translations.t("sym_bloating", lang)
+                            "acne" -> Translations.t("sym_acne", lang)
+                            "fatigue" -> Translations.t("sym_fatigue", lang)
+                            "mood swings" -> Translations.t("sym_mood_swings", lang)
+                            "back pain" -> Translations.t("sym_backache", lang)
+                            "breast tenderness" -> Translations.t("sym_breast_tenderness", lang)
+                            "insomnia" -> if (lang == "हिंदी") "अनिद्रा" else if (lang == "తెలుగు") "నిద్రలేమి" else "Insomnia"
+                            "nausea" -> Translations.t("sym_nausea", lang)
+                            else -> symptom
+                        }
+
                         Surface(
                             onClick = {
                                 selectedSymptoms = if (isSelected) {
@@ -239,8 +261,8 @@ fun LogScreen(storageHelper: StorageHelper) {
                                 }
                             },
                             shape = RoundedCornerShape(20.dp),
-                            color = if (isSelected) Color(0xFFFFF0F5) else LightPinkBg,
-                            border = if (isSelected) BorderStroke(1.5.dp, PrimaryPink) else null,
+                            color = if (isSelected) colors.pinkAccent.copy(alpha = 0.08f) else colors.background,
+                            border = if (isSelected) BorderStroke(1.5.dp, colors.pinkAccent) else null,
                             modifier = Modifier
                                 .height(36.dp)
                                 .testTag("symptom_chip_$symptom")
@@ -250,10 +272,10 @@ fun LogScreen(storageHelper: StorageHelper) {
                                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                             ) {
                                 Text(
-                                    text = symptom,
+                                    text = translatedSymptom,
                                     fontSize = 12.sp,
                                     fontWeight = FontWeight.Medium,
-                                    color = if (isSelected) PrimaryPink else DarkText.copy(alpha = 0.8f)
+                                    color = if (isSelected) colors.pinkAccent else colors.textPrimary
                                 )
                             }
                         }
@@ -262,14 +284,14 @@ fun LogScreen(storageHelper: StorageHelper) {
             }
         }
 
-        // Section 4 — Notes
+        // Section 4: Notes
         Card(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("notes_section_card"),
-            colors = CardDefaults.cardColors(containerColor = White),
+            colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
             shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -277,21 +299,23 @@ fun LogScreen(storageHelper: StorageHelper) {
                     .padding(16.dp)
             ) {
                 Text(
-                    text = "Notes",
+                    text = Translations.t("notes", lang),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
-                    color = DarkText,
+                    color = colors.textPrimary,
                     modifier = Modifier.padding(bottom = 12.dp)
                 )
+
+                val notesPlaceholder = if (lang == "हिंदी") "आप आज कैसा महसूस कर रहे हैं? कुछ लिखने के लिए..." else if (lang == "తెలుగు") "ఈ రోజు మీ అనుభూతి ఎలా ఉంది? ఏదైనా రాయండి..." else "How are you feeling today? Anything to note..."
 
                 OutlinedTextField(
                     value = notesText,
                     onValueChange = { notesText = it },
                     placeholder = {
                         Text(
-                            text = "How are you feeling today? Anything to note...",
+                            text = notesPlaceholder,
                             fontSize = 13.sp,
-                            color = DarkText.copy(alpha = 0.4f)
+                            color = colors.textSecondary.copy(alpha = 0.7f)
                         )
                     },
                     modifier = Modifier
@@ -300,12 +324,10 @@ fun LogScreen(storageHelper: StorageHelper) {
                         .testTag("notes_text_field"),
                     shape = RoundedCornerShape(12.dp),
                     colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = PrimaryPink,
-                        unfocusedBorderColor = LightPinkBg,
-                        focusedContainerColor = LightPinkBg.copy(alpha = 0.5f),
-                        unfocusedContainerColor = LightPinkBg.copy(alpha = 0.5f),
-                        focusedTextColor = DarkText,
-                        unfocusedTextColor = DarkText
+                        focusedBorderColor = colors.pinkAccent,
+                        unfocusedBorderColor = colors.border,
+                        focusedTextColor = colors.textPrimary,
+                        unfocusedTextColor = colors.textPrimary
                     ),
                     textStyle = TextStyle(fontSize = 13.sp)
                 )
@@ -322,9 +344,9 @@ fun LogScreen(storageHelper: StorageHelper) {
                     notes = notesText
                 )
                 storageHelper.saveLog(todayStr, logData)
-                Toast.makeText(context, "Log saved!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, if (lang == "हिंदी") "रिकॉर्ड सहेजा गया!" else if (lang == "తెలుగు") "లాగ్ సేవ్ చేయబడింది!" else "Log saved!", Toast.LENGTH_SHORT).show()
             },
-            colors = ButtonDefaults.buttonColors(containerColor = PrimaryPink),
+            colors = ButtonDefaults.buttonColors(containerColor = colors.pinkAccent),
             shape = RoundedCornerShape(12.dp),
             modifier = Modifier
                 .fillMaxWidth()
@@ -332,10 +354,10 @@ fun LogScreen(storageHelper: StorageHelper) {
                 .testTag("save_log_button")
         ) {
             Text(
-                text = "Save log",
+                text = Translations.t("save_log", lang),
                 fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
-                color = White
+                color = colors.cardBackground
             )
         }
         
