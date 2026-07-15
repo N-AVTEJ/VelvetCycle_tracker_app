@@ -30,18 +30,83 @@ class StorageHelper(context: Context) {
         private const val KEY_CYCLE_LENGTH = "cycle_length"
     }
 
+    // --- SECURE STORAGE HELPERS ---
+    private fun saveSecureString(key: String, value: String?) {
+        if (value == null) {
+            prefs.edit().remove(key).apply()
+        } else {
+            val encrypted = CryptoHelper.encrypt(value)
+            prefs.edit().putString(key, encrypted).apply()
+        }
+    }
+
+    private fun getSecureString(key: String, defaultValue: String = ""): String {
+        val encrypted = prefs.getString(key, null) ?: return defaultValue
+        if (encrypted.contains(":")) {
+            val decrypted = CryptoHelper.decrypt(encrypted)
+            return decrypted.ifEmpty { defaultValue }
+        }
+        return encrypted.ifEmpty { defaultValue }
+    }
+
+    private fun saveSecureInt(key: String, value: Int) {
+        saveSecureString(key, value.toString())
+    }
+
+    private fun getSecureInt(key: String, defaultValue: Int): Int {
+        val encrypted = prefs.getString(key, null)
+        if (encrypted == null) {
+            if (prefs.contains(key)) {
+                try {
+                    return prefs.getInt(key, defaultValue)
+                } catch (e: Exception) {}
+            }
+            return defaultValue
+        }
+        val str = getSecureString(key, "")
+        return str.toIntOrNull() ?: defaultValue
+    }
+
+    private fun saveSecureBoolean(key: String, value: Boolean) {
+        saveSecureString(key, value.toString())
+    }
+
+    private fun getSecureBoolean(key: String, defaultValue: Boolean): Boolean {
+        val encrypted = prefs.getString(key, null)
+        if (encrypted == null) {
+            if (prefs.contains(key)) {
+                try {
+                    return prefs.getBoolean(key, defaultValue)
+                } catch (e: Exception) {}
+            }
+            return defaultValue
+        }
+        val str = getSecureString(key, "")
+        return str.toBooleanStrictOrNull() ?: defaultValue
+    }
+
+    private fun saveSecureLong(key: String, value: Long) {
+        saveSecureString(key, value.toString())
+    }
+
+    private fun getSecureLong(key: String, defaultValue: Long): Long {
+        val str = getSecureString(key, "")
+        return str.toLongOrNull() ?: defaultValue
+    }
+
+    // --- CONVENTIONAL & SECURED PROPERTIES ---
     var isOnboarded: Boolean
         get() = prefs.getBoolean(KEY_IS_ONBOARDED, false)
         set(value) = prefs.edit().putBoolean(KEY_IS_ONBOARDED, value).apply()
 
     var userName: String
-        get() = prefs.getString(KEY_USER_NAME, "") ?: ""
-        set(value) = prefs.edit().putString(KEY_USER_NAME, value).apply()
+        get() = getSecureString(KEY_USER_NAME, "")
+        set(value) = saveSecureString(KEY_USER_NAME, value)
 
     var lastPeriodStart: LocalDate
         get() {
-            val dateStr = prefs.getString(KEY_LAST_PERIOD_START, null)
-            return if (dateStr != null) {
+            val dateStr = getSecureString(KEY_LAST_PERIOD_START, "")
+            return if (dateStr.isNotEmpty()) {
                 try {
                     LocalDate.parse(dateStr)
                 } catch (e: Exception) {
@@ -51,16 +116,21 @@ class StorageHelper(context: Context) {
                 LocalDate.now()
             }
         }
-        set(value) = prefs.edit().putString(KEY_LAST_PERIOD_START, value.toString()).apply()
+        set(value) = saveSecureString(KEY_LAST_PERIOD_START, value.toString())
 
     var periodDuration: Int
-        get() = prefs.getInt(KEY_PERIOD_DURATION, 5)
-        set(value) = prefs.edit().putInt(KEY_PERIOD_DURATION, value).apply()
+        get() = getSecureInt(KEY_PERIOD_DURATION, 5)
+        set(value) = saveSecureInt(KEY_PERIOD_DURATION, value)
 
     var cycleLength: Int
-        get() = prefs.getInt(KEY_CYCLE_LENGTH, 28)
-        set(value) = prefs.edit().putInt(KEY_CYCLE_LENGTH, value).apply()
+        get() = getSecureInt(KEY_CYCLE_LENGTH, 28)
+        set(value) = saveSecureInt(KEY_CYCLE_LENGTH, value)
 
+    var backgroundedAt: Long
+        get() = prefs.getLong("backgrounded_at", 0L)
+        set(value) = prefs.edit().putLong("backgrounded_at", value).apply()
+
+    // --- LOG STORAGE & PROCESSING (ENCRYPTED) ---
     fun saveLog(dateStr: String, logData: LogData) {
         val jsonObject = org.json.JSONObject()
         jsonObject.put("mood", logData.mood)
@@ -70,11 +140,12 @@ class StorageHelper(context: Context) {
         jsonObject.put("symptoms", symptomsArray)
         jsonObject.put("notes", logData.notes)
         
-        prefs.edit().putString("log_$dateStr", jsonObject.toString()).apply()
+        saveSecureString("log_$dateStr", jsonObject.toString())
     }
 
     fun getLog(dateStr: String): LogData? {
-        val jsonStr = prefs.getString("log_$dateStr", null) ?: return null
+        val jsonStr = getSecureString("log_$dateStr", "")
+        if (jsonStr.isEmpty()) return null
         return try {
             val jsonObject = org.json.JSONObject(jsonStr)
             val mood = jsonObject.optString("mood", "")
@@ -155,14 +226,21 @@ class StorageHelper(context: Context) {
         return records.sortedByDescending { it.startDate }
     }
 
-    // Phase 3 Properties
+    // --- SECURE SECURITY PROPERTIES ---
     var userPin: String?
-        get() = prefs.getString("user_pin", null)
-        set(value) = prefs.edit().putString("user_pin", value).apply()
+        get() {
+            val pin = getSecureString("user_pin", "")
+            return pin.ifEmpty { null }
+        }
+        set(value) = saveSecureString("user_pin", value)
 
     var biometricEnabled: Boolean
-        get() = prefs.getBoolean("biometric_enabled", false)
-        set(value) = prefs.edit().putBoolean("biometric_enabled", value).apply()
+        get() = getSecureBoolean("biometric_enabled", false)
+        set(value) = saveSecureBoolean("biometric_enabled", value)
+
+    var disguiseMode: Boolean
+        get() = getSecureBoolean("disguise_mode", false)
+        set(value) = saveSecureBoolean("disguise_mode", value)
 
     var padStore: String
         get() = prefs.getString("pad_store", "") ?: ""
@@ -176,44 +254,45 @@ class StorageHelper(context: Context) {
         get() = prefs.getBoolean("dark_mode", false)
         set(value) = prefs.edit().putBoolean("dark_mode", value).apply()
 
+    // --- SECURE NOTIFICATION PREFERENCES ---
     var periodReminderEnabled: Boolean
-        get() = prefs.getBoolean("notif_period_reminder", true)
-        set(value) = prefs.edit().putBoolean("notif_period_reminder", value).apply()
+        get() = getSecureBoolean("notif_period_reminder", true)
+        set(value) = saveSecureBoolean("notif_period_reminder", value)
 
     var ovulationAlertEnabled: Boolean
-        get() = prefs.getBoolean("notif_ovulation_alert", true)
-        set(value) = prefs.edit().putBoolean("notif_ovulation_alert", value).apply()
+        get() = getSecureBoolean("notif_ovulation_alert", true)
+        set(value) = saveSecureBoolean("notif_ovulation_alert", value)
 
     var dailyLogReminderEnabled: Boolean
-        get() = prefs.getBoolean("notif_daily_log", true)
-        set(value) = prefs.edit().putBoolean("notif_daily_log", value).apply()
+        get() = getSecureBoolean("notif_daily_log", true)
+        set(value) = saveSecureBoolean("notif_daily_log", value)
 
     var dailyLogReminderTime: String
-        get() = prefs.getString("notif_daily_log_time", "21:00") ?: "21:00"
-        set(value) = prefs.edit().putString("notif_daily_log_time", value).apply()
+        get() = getSecureString("notif_daily_log_time", "21:00")
+        set(value) = saveSecureString("notif_daily_log_time", value)
 
     var padReminderEnabled: Boolean
-        get() = prefs.getBoolean("notif_pad_reminder", true)
-        set(value) = prefs.edit().putBoolean("notif_pad_reminder", value).apply()
+        get() = getSecureBoolean("notif_pad_reminder", true)
+        set(value) = saveSecureBoolean("notif_pad_reminder", value)
 
+    // --- ADVANCED LOCKOUT & TIMEOUT MANAGEMENT ---
     fun getLockoutTimeRemaining(): Long {
-        val lockoutTime = prefs.getLong("lockout_time", 0L)
-        if (lockoutTime == 0L) return 0L
-        val diff = (lockoutTime + 5 * 60 * 1000) - System.currentTimeMillis()
+        val expiration = getSecureLong("lockout_expiration_time", 0L)
+        if (expiration == 0L) return 0L
+        val diff = expiration - System.currentTimeMillis()
         return if (diff > 0) diff else 0L
     }
 
-    fun setLockout() {
-        prefs.edit().putLong("lockout_time", System.currentTimeMillis()).apply()
+    fun setLockout(durationMs: Long) {
+        saveSecureLong("lockout_expiration_time", System.currentTimeMillis() + durationMs)
     }
 
     fun clearLockout() {
-        prefs.edit().putLong("lockout_time", 0L).apply()
-        prefs.edit().putInt("wrong_attempts", 0).apply()
+        saveSecureLong("lockout_expiration_time", 0L)
+        saveSecureInt("pin_attempts", 0)
     }
 
     var wrongAttempts: Int
-        get() = prefs.getInt("wrong_attempts", 0)
-        set(value) = prefs.edit().putInt("wrong_attempts", value).apply()
+        get() = getSecureInt("pin_attempts", 0)
+        set(value) = saveSecureInt("pin_attempts", value)
 }
-

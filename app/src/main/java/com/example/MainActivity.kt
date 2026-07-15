@@ -1,10 +1,13 @@
 package com.example
 
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.windowInsetsPadding
@@ -32,11 +35,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -50,47 +56,135 @@ import com.example.screens.SettingsScreen
 import com.example.ui.theme.LocalVelvetColors
 import com.example.ui.theme.MyApplicationTheme
 import com.example.utils.StorageHelper
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 // Provide a globally accessible composition local for translations
 val LocalAppLanguage = staticCompositionLocalOf { "English" }
 
 class MainActivity : androidx.fragment.app.FragmentActivity() {
+    private lateinit var storageHelper: StorageHelper
+    private var isUnlockedState by mutableStateOf(false)
+    private var showPrivacyOverlay by mutableStateOf(false)
+    private var inactivityJob: Job? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
-        val storageHelper = StorageHelper(this)
+        storageHelper = StorageHelper(this)
+        
+        // Screenshot prevention: prevents screenshots and screen recording.
+        // Note: This only works on real device builds (APK/AAB).
+        window.setFlags(
+            WindowManager.LayoutParams.FLAG_SECURE,
+            WindowManager.LayoutParams.FLAG_SECURE
+        )
+        
         if (storageHelper.isOnboarded) {
             com.example.utils.NotificationHelper.scheduleAllNotifications(this, storageHelper)
         }
         
+        isUnlockedState = storageHelper.userPin == null
+
+        // App lifecycle observer for auto-locking and privacy screen overlaying
+        lifecycle.addObserver(LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_STOP -> {
+                    if (storageHelper.userPin != null) {
+                        storageHelper.backgroundedAt = System.currentTimeMillis()
+                    }
+                    // Instantly show the privacy background to protect content in App Switcher
+                    showPrivacyOverlay = true
+                }
+                Lifecycle.Event.ON_START -> {
+                    showPrivacyOverlay = false
+                    if (storageHelper.userPin != null && isUnlockedState) {
+                        val bgTime = storageHelper.backgroundedAt
+                        if (bgTime > 0 && System.currentTimeMillis() - bgTime >= 2 * 60 * 1000L) {
+                            // Lock automatically after 2 minutes in background
+                            isUnlockedState = false
+                        }
+                    }
+                    resetInactivityTimer()
+                }
+                else -> {}
+            }
+        })
+        
         setContent {
-            // Hoist the language and dark theme states so edits in Settings instantly re-render the app
             var isDarkTheme by remember { mutableStateOf(storageHelper.isDarkMode) }
             var appLanguage by remember { mutableStateOf(storageHelper.appLanguage) }
 
             MyApplicationTheme(darkTheme = isDarkTheme) {
                 CompositionLocalProvider(LocalAppLanguage provides appLanguage) {
-                    var isUnlocked by remember { 
-                        mutableStateOf(storageHelper.userPin == null) 
-                    }
-                    
-                    if (!isUnlocked) {
-                        com.example.screens.PinScreen(
-                            storageHelper = storageHelper,
-                            initialMode = com.example.screens.PinMode.Verify,
-                            onUnlocked = { isUnlocked = true }
-                        )
-                    } else {
-                        MainAppLayout(
-                            storageHelper = storageHelper,
-                            onLanguageChanged = { newLang -> appLanguage = newLang },
-                            onThemeChanged = { isDark -> isDarkTheme = isDark }
-                        )
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        if (!isUnlockedState) {
+                            com.example.screens.PinScreen(
+                                storageHelper = storageHelper,
+                                initialMode = com.example.screens.PinMode.Verify,
+                                onUnlocked = { 
+                                    isUnlockedState = true 
+                                    resetInactivityTimer()
+                                },
+                                onEmergencyWipe = {
+                                    storageHelper.clear()
+                                    com.example.utils.NotificationHelper.cancelAllNotifications(this@MainActivity)
+                                    isUnlockedState = storageHelper.userPin == null
+                                }
+                            )
+                        } else {
+                            MainAppLayout(
+                                storageHelper = storageHelper,
+                                onLanguageChanged = { newLang -> appLanguage = newLang },
+                                onThemeChanged = { isDark -> isDarkTheme = isDark }
+                            )
+                        }
+
+                        if (showPrivacyOverlay) {
+                            PrivacyOverlay()
+                        }
                     }
                 }
             }
         }
+    }
+
+    override fun dispatchTouchEvent(ev: android.view.MotionEvent?): Boolean {
+        resetInactivityTimer()
+        return super.dispatchTouchEvent(ev)
+    }
+
+    private fun resetInactivityTimer() {
+        inactivityJob?.cancel()
+        if (storageHelper.userPin == null || !isUnlockedState) return
+        
+        inactivityJob = CoroutineScope(Dispatchers.Main).launch {
+            delay(10 * 60 * 1000L) // Auto-lock after 10 minutes of complete touch inactivity
+            isUnlockedState = false
+        }
+    }
+}
+
+@Composable
+fun PrivacyOverlay() {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(androidx.compose.ui.graphics.Color(0xFFD4537E))
+            .testTag("privacy_overlay"),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = "VelvetCycle",
+            fontSize = 32.sp,
+            fontWeight = FontWeight.Bold,
+            color = androidx.compose.ui.graphics.Color.White,
+            letterSpacing = 1.sp
+        )
     }
 }
 
@@ -110,13 +204,12 @@ fun MainAppLayout(
     val showBottomBar = currentRoute != "onboarding" && currentRoute != null
     val startDestination = if (storageHelper.isOnboarded) "home" else "onboarding"
 
-    // Dynamic helper for quick translations in the shell layout
     val translateLabel = { route: String, default: String ->
         when (route) {
             "home" -> if (currentLanguage == "हिंदी") "होम" else if (currentLanguage == "తెలుగు") "హోమ్" else "Home"
             "calendar" -> if (currentLanguage == "हिंदी") "कैलेंडर" else if (currentLanguage == "తెలుగు") "క్యాలెండర్" else "Calendar"
             "log" -> if (currentLanguage == "हिंदी") "लॉग" else if (currentLanguage == "తెలుగు") "లాగ్" else "Log"
-            "insights" -> if (currentLanguage == "हिंदी") "आंकड़े" else if (currentLanguage == "తెలుగు") "అంతర్దృష్టులు" else "Insights"
+            "insights" -> if (currentLanguage == "हिंदी") "आंकड़े" else if (currentLanguage == "తెలుగు") "అంతర్దృష్తులు" else "Insights"
             "settings" -> if (currentLanguage == "हिंदी") "सेटिंग्स" else if (currentLanguage == "తెలుగు") "సెట్టింగ్స్" else "Settings"
             else -> default
         }

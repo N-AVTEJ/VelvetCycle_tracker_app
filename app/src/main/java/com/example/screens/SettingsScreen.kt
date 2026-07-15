@@ -63,6 +63,7 @@ fun SettingsScreen(
     var isPinSet by remember { mutableStateOf(storageHelper.userPin != null) }
     var biometricEnabled by remember { mutableStateOf(storageHelper.biometricEnabled) }
     var pinSetupMode by remember { mutableStateOf<PinMode?>(null) } 
+    var disguiseEnabled by remember { mutableStateOf(storageHelper.disguiseMode) }
 
     // Store & Language states
     var selectedStore by remember { mutableStateOf(storageHelper.padStore) }
@@ -365,6 +366,17 @@ fun SettingsScreen(
                         onCheckedChange = {
                             biometricEnabled = it
                             storageHelper.biometricEnabled = it
+                        }
+                    )
+                    Divider(color = colors.border, thickness = 0.5.dp)
+
+                    NotificationToggleItem(
+                        title = if (lang == "हिंदी") "ऐप छुपाएं" else if (lang == "తెలుగు") "యాప్‌ను దాచండి" else "Disguise app",
+                        subtitle = if (lang == "हिंदी") "अनलॉक स्क्रीन को एक कैलकुलेटर के रूप में छुपाएं" else if (lang == "తెలుగు") "లాక్ స్క్రీన్‌ను సాధారణ కాలిక్యులేటర్‌గా చూపించు" else "Disguise PIN screen as a plain calculator",
+                        checked = disguiseEnabled,
+                        onCheckedChange = {
+                            disguiseEnabled = it
+                            storageHelper.disguiseMode = it
                         }
                     )
                     Divider(color = colors.border, thickness = 0.5.dp)
