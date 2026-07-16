@@ -227,7 +227,7 @@ fun CalendarScreen(
                                                 modifier = Modifier
                                                     .size(5.dp)
                                                     .clip(CircleShape)
-                                                    .background(Color(0xFFFFA726))
+                                                    .background(Color(0xFFFF8C42))
                                             )
                                         }
                                     }
@@ -238,6 +238,27 @@ fun CalendarScreen(
                         }
                     }
                 }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                Divider(color = colors.border, thickness = 0.5.dp)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Legend
+                FlowRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val labelPeriod = if (lang == "हिंदी") "मासिक धर्म का दिन" else if (lang == "తెలుగు") "పీరియడ్ రోజు" else "Period day"
+                    val labelFertile = if (lang == "हिंदी") "उर्वर अवधि" else if (lang == "తెలుగు") "సంతానోత్పత్తి సమయం" else "Fertile window"
+                    val labelOvulation = if (lang == "हिंदी") "डिंबोत्सर्जन दिवस" else if (lang == "తెలుగు") "అండవిడుదల రోజు" else "Ovulation day"
+                    val labelPrepare = Translations.t("prepare_day", lang)
+
+                    LegendItem(color = SecondaryPink, label = labelPeriod, isDot = false)
+                    LegendItem(color = FertileGreen, label = labelFertile, isDot = false)
+                    LegendItem(color = Teal, label = labelOvulation, isDot = true)
+                    LegendItem(color = Color(0xFFFF8C42), label = labelPrepare, isDot = true)
+                }
             }
         }
 
@@ -246,9 +267,11 @@ fun CalendarScreen(
             val isPeriod = isPeriodDay(date, lastPeriodStart, cycleLength, periodDuration)
             val isFertile = isFertileDay(date, lastPeriodStart, cycleLength)
             val isOvulation = isOvulationDay(date, lastPeriodStart, cycleLength)
+            val isPrepare = isPrepareDay(date, lastPeriodStart, cycleLength)
 
             val statusTitle = when {
                 isPeriod -> if (lang == "हिंदी") "मासिक धर्म का दिन" else if (lang == "తెలుగు") "పీరియడ్ రోజు" else "Period Day"
+                isPrepare -> Translations.t("prepare_day", lang)
                 isOvulation -> if (lang == "हिंदी") "डिंबोत्सर्जन दिवस" else if (lang == "తెలుగు") "అండవిడుదల రోజు" else "Ovulation Day"
                 isFertile -> if (lang == "हिंदी") "उर्वर अवधि (Fertility)" else if (lang == "తెలుగు") "సంతానోత్పత్తి సమయం" else "Fertile Window"
                 else -> if (lang == "हिंदी") "सामान्य दिन" else if (lang == "తెలుగు") "సాధారణ రోజు" else "Regular Day"
@@ -256,6 +279,7 @@ fun CalendarScreen(
 
             val statusColor = when {
                 isPeriod -> colors.pinkAccent
+                isPrepare -> Color(0xFFFF8C42)
                 isOvulation -> Teal
                 isFertile -> colors.textPrimary
                 else -> colors.textSecondary
@@ -263,9 +287,10 @@ fun CalendarScreen(
 
             val statusDescription = when {
                 isPeriod -> if (lang == "हिंदी") "मासिक धर्म चरण। पर्याप्त विश्राम और गर्म पानी पिएं।" else if (lang == "తెలుగు") "పీరియడ్ సమయం. తగినంత విశ్రాంతి తీసుకోండి." else "Expected menstrual phase. Rest and hydrate well."
+                isPrepare -> if (lang == "हिंदी") "कल मासिक धर्म होने की उम्मीद है। अपना पैड स्टॉक जांचें और एक आसान दिन की योजना बनाएं।" else if (lang == "తెలుగు") "మీ పీరియడ్ రేపు రావచ్చు. మీ ప్యాడ్ స్టాక్ సరిచూసుకోండి మరియు తేలికపాటి రోజును ప్లాన్ చేయండి." else "Period expected tomorrow. Check your pad stock and plan a gentle day."
                 isOvulation -> if (lang == "हिंदी") "अंडा जारी होने का चरम! गर्भधारण की संभावना सबसे अधिक।" else if (lang == "తెలుగు") "అండవిడుదల సమయం! గర్భం దాల్చడానికి ఎక్కువ అవకాశాలు ఉన్నాయి." else "Egg release peak! Conception chances are very high."
                 isFertile -> if (lang == "हिंदी") "गर्भधारण के लिए अनुकूल समय। स्वस्थ रहें।" else if (lang == "తెలుగు") "గర్భం దాల్చడానికి అనుకూల సమయం. ఆరోగ్యం పట్ల శ్రద్ధ వహించండి." else "Favorable time for conception. General wellness."
-                else -> if (lang == "हिंदी") "गर्भधारण की कम संभावना। सामान्य चक्र दिवस।" else if (lang == "తెలుగు") "గర్భం దాల్చడానికి తక్కువ అవకాశాలు ఉన్నాయి. సాధారణ చక్రం రోజు." else "Low chances of conception. Normal cycle day."
+                else -> if (lang == "हिंदी") "गर्भधारण की कम संभावना। सामान्य चक्र दिवस।" else if (lang == "తెలుగు") "గర్భం దాల్చడానికి तక్కువ అవకాశాలు ఉన్నాయి. సాధారణ చక్రం రోజు." else "Low chances of conception. Normal cycle day."
             }
 
             val log = storageHelper.getLog(date.toString())
@@ -302,7 +327,7 @@ fun CalendarScreen(
                                 .background(
                                     when {
                                         isPeriod -> colors.pinkAccent
-                                        isPrepare -> Color(0xFFFFA726)
+                                        isPrepare -> Color(0xFFFF8C42)
                                         isOvulation -> Teal
                                         isFertile -> FertileGreen
                                         else -> colors.border

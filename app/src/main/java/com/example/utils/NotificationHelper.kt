@@ -263,4 +263,19 @@ object NotificationHelper {
             pendingIntent.cancel()
         }
     }
+
+    fun scheduleTestNotificationIfNeeded(context: Context, storageHelper: StorageHelper) {
+        if (!storageHelper.notificationTestSent) {
+            storageHelper.notificationTestSent = true
+            val triggerTimeMs = System.currentTimeMillis() + 10_000L
+            scheduleAlarm(
+                context = context,
+                id = 9999,
+                triggerTimeMs = triggerTimeMs,
+                title = "VelvetCycle notifications are working! 💕",
+                body = "You will now get period reminders, ovulation alerts, and pad reminders."
+            )
+            Log.d(TAG, "Scheduled test notification 10 seconds from now.")
+        }
+    }
 }

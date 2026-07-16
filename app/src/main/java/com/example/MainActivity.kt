@@ -201,8 +201,14 @@ fun MainAppLayout(
     val currentLanguage = LocalAppLanguage.current
     val colors = LocalVelvetColors.current
     
-    val showBottomBar = currentRoute != "onboarding" && currentRoute != null
-    val startDestination = if (storageHelper.isOnboarded) "home" else "onboarding"
+    val showBottomBar = currentRoute != "onboarding" && currentRoute != "permissions" && currentRoute != null
+    val startDestination = if (!storageHelper.isOnboarded) {
+        "onboarding"
+    } else if (!storageHelper.permissionsAsked) {
+        "permissions"
+    } else {
+        "home"
+    }
 
     val translateLabel = { route: String, default: String ->
         when (route) {
@@ -283,8 +289,19 @@ fun MainAppLayout(
                 OnboardingScreen(
                     storageHelper = storageHelper,
                     onOnboardingFinished = {
-                        navController.navigate("home") {
+                        val nextDest = if (!storageHelper.permissionsAsked) "permissions" else "home"
+                        navController.navigate(nextDest) {
                             popUpTo("onboarding") { inclusive = true }
+                        }
+                    }
+                )
+            }
+            composable("permissions") {
+                com.example.screens.PermissionsScreen(
+                    storageHelper = storageHelper,
+                    onContinueClicked = {
+                        navController.navigate("home") {
+                            popUpTo("permissions") { inclusive = true }
                         }
                     }
                 )

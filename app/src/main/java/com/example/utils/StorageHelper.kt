@@ -250,6 +250,14 @@ class StorageHelper(context: Context) {
         get() = prefs.getString("app_language", "English") ?: "English"
         set(value) = prefs.edit().putString("app_language", value).apply()
 
+    var permissionsAsked: Boolean
+        get() = prefs.getBoolean("permissions_asked", false)
+        set(value) = prefs.edit().putBoolean("permissions_asked", value).apply()
+
+    var notificationTestSent: Boolean
+        get() = prefs.getBoolean("notification_test_sent", false)
+        set(value) = prefs.edit().putBoolean("notification_test_sent", value).apply()
+
     var isDarkMode: Boolean
         get() = prefs.getBoolean("dark_mode", false)
         set(value) = prefs.edit().putBoolean("dark_mode", value).apply()
