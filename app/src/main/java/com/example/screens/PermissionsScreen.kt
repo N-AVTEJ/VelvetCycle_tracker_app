@@ -124,6 +124,8 @@ fun PermissionsScreen(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
         hasNotificationPermission = isGranted
+        // Ensure state is committed instantly so that if the OS kills the process, the app state is preserved
+        storageHelper.permissionsAsked = true
         if (isGranted) {
             // First time permission granted -> create notification channel, schedule alarms & send test notification after 10s
             NotificationHelper.createNotificationChannel(context)
@@ -253,7 +255,8 @@ fun PermissionsScreen(
                             } else {
                                 OutlinedButton(
                                     onClick = {
-                                        // Just mark permissionsAsked as true but don't request system permission
+                                        // Mark permissions asked as true synchronously and show Toast
+                                        storageHelper.permissionsAsked = true
                                         Toast.makeText(context, "Notification reminders skipped.", Toast.LENGTH_SHORT).show()
                                     },
                                     border = BorderStroke(1.dp, colors.border),
@@ -268,6 +271,7 @@ fun PermissionsScreen(
 
                                 Button(
                                     onClick = {
+                                        storageHelper.permissionsAsked = true
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                         } else {

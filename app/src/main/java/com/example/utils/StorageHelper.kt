@@ -33,10 +33,10 @@ class StorageHelper(context: Context) {
     // --- SECURE STORAGE HELPERS ---
     private fun saveSecureString(key: String, value: String?) {
         if (value == null) {
-            prefs.edit().remove(key).apply()
+            prefs.edit().remove(key).commit()
         } else {
             val encrypted = CryptoHelper.encrypt(value)
-            prefs.edit().putString(key, encrypted).apply()
+            prefs.edit().putString(key, encrypted).commit()
         }
     }
 
@@ -97,7 +97,7 @@ class StorageHelper(context: Context) {
     // --- CONVENTIONAL & SECURED PROPERTIES ---
     var isOnboarded: Boolean
         get() = prefs.getBoolean(KEY_IS_ONBOARDED, false)
-        set(value) = prefs.edit().putBoolean(KEY_IS_ONBOARDED, value).apply()
+        set(value) { prefs.edit().putBoolean(KEY_IS_ONBOARDED, value).commit() }
 
     var userName: String
         get() = getSecureString(KEY_USER_NAME, "")
@@ -128,7 +128,7 @@ class StorageHelper(context: Context) {
 
     var backgroundedAt: Long
         get() = prefs.getLong("backgrounded_at", 0L)
-        set(value) = prefs.edit().putLong("backgrounded_at", value).apply()
+        set(value) { prefs.edit().putLong("backgrounded_at", value).commit() }
 
     // --- LOG STORAGE & PROCESSING (ENCRYPTED) ---
     fun saveLog(dateStr: String, logData: LogData) {
@@ -165,7 +165,7 @@ class StorageHelper(context: Context) {
     }
 
     fun clear() {
-        prefs.edit().clear().apply()
+        prefs.edit().clear().commit()
     }
 
     fun getAllLogs(): Map<String, LogData> {
@@ -244,23 +244,23 @@ class StorageHelper(context: Context) {
 
     var padStore: String
         get() = prefs.getString("pad_store", "") ?: ""
-        set(value) = prefs.edit().putString("pad_store", value).apply()
+        set(value) { prefs.edit().putString("pad_store", value).commit() }
 
     var appLanguage: String
         get() = prefs.getString("app_language", "English") ?: "English"
-        set(value) = prefs.edit().putString("app_language", value).apply()
+        set(value) { prefs.edit().putString("app_language", value).commit() }
 
     var permissionsAsked: Boolean
         get() = prefs.getBoolean("permissions_asked", false)
-        set(value) = prefs.edit().putBoolean("permissions_asked", value).apply()
+        set(value) { prefs.edit().putBoolean("permissions_asked", value).commit() }
 
     var notificationTestSent: Boolean
         get() = prefs.getBoolean("notification_test_sent", false)
-        set(value) = prefs.edit().putBoolean("notification_test_sent", value).apply()
+        set(value) { prefs.edit().putBoolean("notification_test_sent", value).commit() }
 
     var isDarkMode: Boolean
         get() = prefs.getBoolean("dark_mode", false)
-        set(value) = prefs.edit().putBoolean("dark_mode", value).apply()
+        set(value) { prefs.edit().putBoolean("dark_mode", value).commit() }
 
     // --- SECURE NOTIFICATION PREFERENCES ---
     var periodReminderEnabled: Boolean

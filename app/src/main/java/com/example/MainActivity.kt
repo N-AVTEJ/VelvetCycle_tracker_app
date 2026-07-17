@@ -78,11 +78,11 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
         storageHelper = StorageHelper(this)
         
         // Screenshot prevention: prevents screenshots and screen recording.
-        // Note: This only works on real device builds (APK/AAB).
-        window.setFlags(
-            WindowManager.LayoutParams.FLAG_SECURE,
-            WindowManager.LayoutParams.FLAG_SECURE
-        )
+        // Disabled here because FLAG_SECURE makes the streaming emulator screen black.
+        // window.setFlags(
+        //     WindowManager.LayoutParams.FLAG_SECURE,
+        //     WindowManager.LayoutParams.FLAG_SECURE
+        // )
         
         if (storageHelper.isOnboarded) {
             com.example.utils.NotificationHelper.scheduleAllNotifications(this, storageHelper)
