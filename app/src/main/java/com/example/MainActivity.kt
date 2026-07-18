@@ -202,12 +202,14 @@ fun MainAppLayout(
     val colors = LocalVelvetColors.current
     
     val showBottomBar = currentRoute != "onboarding" && currentRoute != "permissions" && currentRoute != null
-    val startDestination = if (!storageHelper.isOnboarded) {
-        "onboarding"
-    } else if (!storageHelper.permissionsAsked) {
-        "permissions"
-    } else {
-        "home"
+    val startDestination = remember {
+        if (!storageHelper.isOnboarded) {
+            "onboarding"
+        } else if (!storageHelper.permissionsAsked) {
+            "permissions"
+        } else {
+            "home"
+        }
     }
 
     val translateLabel = { route: String, default: String ->

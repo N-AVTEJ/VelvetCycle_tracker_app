@@ -120,9 +120,12 @@ fun PermissionsScreen(
         )
     }
 
+    var isRequestingPermission by remember { mutableStateOf(false) }
+
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
+        isRequestingPermission = false
         hasNotificationPermission = isGranted
         // Ensure state is committed instantly so that if the OS kills the process, the app state is preserved
         storageHelper.permissionsAsked = true
@@ -262,6 +265,7 @@ fun PermissionsScreen(
                                     border = BorderStroke(1.dp, colors.border),
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.textSecondary),
                                     shape = RoundedCornerShape(8.dp),
+                                    enabled = !isRequestingPermission,
                                     modifier = Modifier
                                         .padding(end = 8.dp)
                                         .testTag("btn_skip_notification")
@@ -269,23 +273,55 @@ fun PermissionsScreen(
                                     Text(btnSkip, fontWeight = FontWeight.Medium, fontSize = 13.sp)
                                 }
 
-                                Button(
-                                    onClick = {
-                                        storageHelper.permissionsAsked = true
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                            permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                        } else {
-                                            hasNotificationPermission = true
-                                            NotificationHelper.createNotificationChannel(context)
-                                            NotificationHelper.scheduleAllNotifications(context, storageHelper)
-                                            NotificationHelper.scheduleTestNotificationIfNeeded(context, storageHelper)
+                                if (isRequestingPermission) {
+                                    Button(
+                                        onClick = {},
+                                        enabled = false,
+                                        colors = ButtonDefaults.buttonColors(
+                                            disabledContainerColor = colors.border.copy(alpha = 0.5f),
+                                            disabledContentColor = colors.textSecondary
+                                        ),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.testTag("btn_requesting_notification")
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                        ) {
+                                            CircularProgressIndicator(
+                                                modifier = Modifier.size(16.dp),
+                                                color = colors.textSecondary,
+                                                strokeWidth = 2.dp
+                                            )
+                                            Text(
+                                                text = if (lang == "हिंदी") "अनुरोध कर रहा है..." else if (lang == "తెలుగు") "అభ్యర్థిస్తోంది..." else "Requesting...",
+                                                color = colors.textSecondary,
+                                                fontWeight = FontWeight.Medium,
+                                                fontSize = 13.sp
+                                            )
                                         }
-                                    },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
-                                    shape = RoundedCornerShape(8.dp),
-                                    modifier = Modifier.testTag("btn_allow_notification")
-                                ) {
-                                    Text(btnAllow, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+                                } else {
+                                    Button(
+                                        onClick = {
+                                            isRequestingPermission = true
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                            } else {
+                                                isRequestingPermission = false
+                                                hasNotificationPermission = true
+                                                storageHelper.permissionsAsked = true
+                                                NotificationHelper.createNotificationChannel(context)
+                                                NotificationHelper.scheduleAllNotifications(context, storageHelper)
+                                                NotificationHelper.scheduleTestNotificationIfNeeded(context, storageHelper)
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50)),
+                                        shape = RoundedCornerShape(8.dp),
+                                        modifier = Modifier.testTag("btn_allow_notification")
+                                    ) {
+                                        Text(btnAllow, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
                                 }
                             }
                         }
