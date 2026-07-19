@@ -159,7 +159,7 @@ fun HomeScreen(
 
         // --- Pad Reminder Banner (Phase 3 Requirement 4) ---
         AnimatedVisibility(
-            visible = daysUntilNextPeriod == 2,
+            visible = daysUntilNextPeriod == 1 || daysUntilNextPeriod == 2,
             enter = expandVertically(),
             exit = shrinkVertically()
         ) {
@@ -197,7 +197,13 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(8.dp))
 
                     Text(
-                        text = Translations.t("pad_reminder_banner_text", lang),
+                        text = if (daysUntilNextPeriod == 1) {
+                            if (lang == "हिंदी") "आपका मासिक धर्म कल होने की उम्मीद है। पैड का स्टॉक कर लें।" 
+                            else if (lang == "తెలుగు") "మీ పీరియడ్ రేపు ప్రారంభమౌతుంది. ప్యాడ్‌లు సిద్ధం చేసుకోండి." 
+                            else "Your period is expected tomorrow. Stock up on pads."
+                        } else {
+                            Translations.t("pad_reminder_banner_text", lang)
+                        },
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
                         color = colors.textPrimary,
@@ -211,64 +217,25 @@ fun HomeScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         val context = androidx.compose.ui.platform.LocalContext.current
-                        val shopBlinkitLabel = if (lang == "हिंदी") "ब्लिंकिट से मंगवाएं" else if (lang == "తెలుగు") "బ్లింకిట్ ప్యాడ్స్" else "Blinkit"
-                        val shopZeptoLabel = if (lang == "हिंदी") "जेप्टो से मंगवाएं" else if (lang == "తెలుగు") "జెప్టో ప్యాడ్స్" else "Zepto"
-                        val shopAmazonLabel = if (lang == "हिंदी") "अमेज़न इंडिया" else if (lang == "తెలుగు") "అమెజాన్ ఇండియా" else "Amazon"
+                        val shopBlinkitLabel = if (lang == "हिंदी") "ब्लिंकिट से मंगवाएं" else if (lang == "తెలుగు") "బ్లింకిట్ ప్యాడ్స్" else "Order on Blinkit"
+                        val shopZeptoLabel = if (lang == "हिंदी") "जेप्टो से मंगवाएं" else if (lang == "తెలుగు") "జెప్టో ప్యాడ్స్" else "Order on Zepto"
 
-                        if (padStore == "zepto") {
-                            Button(
-                                onClick = { com.example.utils.StoreLinks.openStore(context, com.example.utils.StoreLinks.ZEPTO_KEY) },
-                                colors = ButtonDefaults.buttonColors(containerColor = colors.pinkAccent),
-                                modifier = Modifier.weight(1f).testTag("shop_zepto_button"),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text(shopZeptoLabel, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = colors.cardBackground)
-                            }
+                        Button(
+                            onClick = { com.example.utils.StoreLinks.openStore(context, com.example.utils.StoreLinks.BLINKIT_KEY) },
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.pinkAccent),
+                            modifier = Modifier.weight(1f).testTag("shop_blinkit_button"),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(shopBlinkitLabel, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = colors.cardBackground)
+                        }
 
-                            Button(
-                                onClick = { uriHandler.openUri("https://amazon.in/s?k=sanitary+pads") },
-                                colors = ButtonDefaults.buttonColors(containerColor = colors.textPrimary),
-                                modifier = Modifier.weight(1f).testTag("shop_amazon_button"),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text(shopAmazonLabel, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = colors.cardBackground)
-                            }
-                        } else if (padStore == "blinkit") {
-                            Button(
-                                onClick = { com.example.utils.StoreLinks.openStore(context, com.example.utils.StoreLinks.BLINKIT_KEY) },
-                                colors = ButtonDefaults.buttonColors(containerColor = colors.pinkAccent),
-                                modifier = Modifier.weight(1f).testTag("shop_blinkit_button"),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text(shopBlinkitLabel, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = colors.cardBackground)
-                            }
-
-                            Button(
-                                onClick = { uriHandler.openUri("https://amazon.in/s?k=sanitary+pads") },
-                                colors = ButtonDefaults.buttonColors(containerColor = colors.textPrimary),
-                                modifier = Modifier.weight(1f).testTag("shop_amazon_button"),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text(shopAmazonLabel, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = colors.cardBackground)
-                            }
-                        } else {
-                            Button(
-                                onClick = { com.example.utils.StoreLinks.openStore(context, com.example.utils.StoreLinks.BLINKIT_KEY) },
-                                colors = ButtonDefaults.buttonColors(containerColor = colors.pinkAccent),
-                                modifier = Modifier.weight(1f).testTag("shop_blinkit_button"),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text(shopBlinkitLabel, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = colors.cardBackground)
-                            }
-
-                            Button(
-                                onClick = { com.example.utils.StoreLinks.openStore(context, com.example.utils.StoreLinks.ZEPTO_KEY) },
-                                colors = ButtonDefaults.buttonColors(containerColor = colors.textPrimary),
-                                modifier = Modifier.weight(1f).testTag("shop_zepto_button"),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Text(shopZeptoLabel, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = colors.cardBackground)
-                            }
+                        Button(
+                            onClick = { com.example.utils.StoreLinks.openStore(context, com.example.utils.StoreLinks.ZEPTO_KEY) },
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.textPrimary),
+                            modifier = Modifier.weight(1f).testTag("shop_zepto_button"),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Text(shopZeptoLabel, fontWeight = FontWeight.Bold, fontSize = 12.sp, color = colors.cardBackground)
                         }
                     }
                 }
