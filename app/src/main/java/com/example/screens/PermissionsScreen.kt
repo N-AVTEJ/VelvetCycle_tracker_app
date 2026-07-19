@@ -122,21 +122,42 @@ fun PermissionsScreen(
 
     var isRequestingPermission by remember { mutableStateOf(false) }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        isRequestingPermission = false
-        hasNotificationPermission = isGranted
-        // Ensure state is committed instantly so that if the OS kills the process, the app state is preserved
-        storageHelper.permissionsAsked = true
-        if (isGranted) {
-            // First time permission granted -> create notification channel, schedule alarms & send test notification after 10s
-            NotificationHelper.createNotificationChannel(context)
-            NotificationHelper.scheduleAllNotifications(context, storageHelper)
-            NotificationHelper.scheduleTestNotificationIfNeeded(context, storageHelper)
-            Toast.makeText(context, "Notification permission granted! 💕", Toast.LENGTH_SHORT).show()
-        } else {
-            Toast.makeText(context, "Notifications disabled. You can enable them in Settings.", Toast.LENGTH_LONG).show()
+    val mainActivity = context as? com.example.MainActivity
+    DisposableEffect(mainActivity) {
+        if (mainActivity != null) {
+            mainActivity.onPermissionResultListener = { reqCode, _, grantResults ->
+                if (reqCode == 1001) {
+                    try {
+                        isRequestingPermission = false
+                        val isGranted = grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED
+                        hasNotificationPermission = isGranted
+                        // Ensure state is committed instantly so that if the OS kills the process, the app state is preserved
+                        storageHelper.permissionsAsked = true
+                        if (isGranted) {
+                            // First time permission granted -> create notification channel, schedule alarms & send test notification after 10s
+                            NotificationHelper.createNotificationChannel(context)
+                            NotificationHelper.scheduleAllNotifications(context, storageHelper)
+                            NotificationHelper.scheduleTestNotificationIfNeeded(context, storageHelper)
+                            Toast.makeText(context, "Notification permission granted! 💕", Toast.LENGTH_SHORT).show()
+                        } else {
+                            Toast.makeText(context, "Notifications disabled. You can enable them in Settings.", Toast.LENGTH_LONG).show()
+                        }
+                        // Auto-navigate to home screen on permission selection
+                        onContinueClicked()
+                    } catch (e: Exception) {
+                        Log.e("PermissionsScreen", "Error in permissionLauncher callback", e)
+                        Toast.makeText(context, "Error setting up notifications: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+                        // Even if scheduling fails, ensure we mark asked as true and navigate
+                        storageHelper.permissionsAsked = true
+                        onContinueClicked()
+                    }
+                }
+            }
+        }
+        onDispose {
+            if (mainActivity != null) {
+                mainActivity.onPermissionResultListener = null
+            }
         }
     }
 
@@ -261,6 +282,7 @@ fun PermissionsScreen(
                                         // Mark permissions asked as true synchronously and show Toast
                                         storageHelper.permissionsAsked = true
                                         Toast.makeText(context, "Notification reminders skipped.", Toast.LENGTH_SHORT).show()
+                                        onContinueClicked()
                                     },
                                     border = BorderStroke(1.dp, colors.border),
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.textSecondary),
@@ -306,7 +328,16 @@ fun PermissionsScreen(
                                         onClick = {
                                             isRequestingPermission = true
                                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                                val act = context as? android.app.Activity
+                                                if (act != null) {
+                                                    androidx.core.app.ActivityCompat.requestPermissions(
+                                                        act,
+                                                        arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                                                        1001
+                                                     )
+                                                } else {
+                                                    isRequestingPermission = false
+                                                }
                                             } else {
                                                 isRequestingPermission = false
                                                 hasNotificationPermission = true

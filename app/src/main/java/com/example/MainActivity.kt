@@ -70,6 +70,17 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     private var isUnlockedState by mutableStateOf(false)
     private var showPrivacyOverlay by mutableStateOf(false)
     private var inactivityJob: Job? = null
+    
+    var onPermissionResultListener: ((Int, Array<out String>, IntArray) -> Unit)? = null
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        onPermissionResultListener?.invoke(requestCode, permissions, grantResults)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -202,7 +213,7 @@ fun MainAppLayout(
     val colors = LocalVelvetColors.current
     
     val showBottomBar = currentRoute != "onboarding" && currentRoute != "permissions" && currentRoute != null
-    val startDestination = remember {
+    val startDestination = remember(storageHelper.isOnboarded, storageHelper.permissionsAsked) {
         if (!storageHelper.isOnboarded) {
             "onboarding"
         } else if (!storageHelper.permissionsAsked) {
