@@ -39,43 +39,72 @@ object NotificationHelper {
     fun scheduleAllNotifications(context: Context, storageHelper: StorageHelper) {
         createNotificationChannel(context)
         
+        // Log current permission status
+        val permissionStatus = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            val status = androidx.core.content.ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.POST_NOTIFICATIONS
+            )
+            if (status == android.content.pm.PackageManager.PERMISSION_GRANTED) "GRANTED" else "DENIED"
+        } else {
+            "GRANTED (Android version < 13)"
+        }
+        Log.d(TAG, "Scheduling notifications. POST_NOTIFICATIONS permission status: $permissionStatus")
+
         val lastPeriodStart = storageHelper.lastPeriodStart
         val cycleLength = storageHelper.cycleLength
+        
+        Log.d(TAG, "User cycle info: lastPeriodStart = $lastPeriodStart, cycleLength = $cycleLength")
 
         // 1. Period Reminder: 2 days before predicted next period date at 9:00 AM
         if (storageHelper.periodReminderEnabled) {
-            val nextPeriodDate = lastPeriodStart.plusDays(cycleLength.toLong())
-            val reminderDate = nextPeriodDate.minusDays(2)
-            val triggerTime = getTriggerTimeMillis(reminderDate, 9, 0)
+            val nextPeriodDate = CycleEngine.getNextPeriodDateProjected(lastPeriodStart, cycleLength)
+            var reminderDate = nextPeriodDate.minusDays(2)
+            var triggerTime = getTriggerTimeMillis(reminderDate, 9, 0)
             
-            if (triggerTime > System.currentTimeMillis()) {
-                scheduleAlarm(
-                    context = context,
-                    id = ID_PERIOD_REMINDER,
-                    triggerTimeMs = triggerTime,
-                    title = "Period coming soon 🌸",
-                    body = "Your period is expected in 2 days. Take care of yourself."
-                )
+            if (triggerTime <= System.currentTimeMillis()) {
+                // If 2 days before the current projected period is already in the past, schedule for the next cycle
+                val nextNextPeriodDate = nextPeriodDate.plusDays(cycleLength.toLong())
+                reminderDate = nextNextPeriodDate.minusDays(2)
+                triggerTime = getTriggerTimeMillis(reminderDate, 9, 0)
             }
+            
+            Log.d(TAG, "Calculated period reminder date: $reminderDate at 9:00 AM (Trigger Time: $triggerTime ms)")
+            scheduleAlarm(
+                context = context,
+                id = ID_PERIOD_REMINDER,
+                triggerTimeMs = triggerTime,
+                title = "Period coming soon 🌸",
+                body = "Your period is expected in 2 days. Take care of yourself."
+            )
         } else {
+            Log.d(TAG, "Period reminder is disabled. Cancelling alarm.")
             cancelAlarm(context, ID_PERIOD_REMINDER)
         }
 
         // 2. Ovulation Alert: on ovulation day at 9:00 AM
         if (storageHelper.ovulationAlertEnabled) {
-            val ovulationDate = lastPeriodStart.plusDays((cycleLength - 14).toLong())
-            val triggerTime = getTriggerTimeMillis(ovulationDate, 9, 0)
+            val nextPeriodDate = CycleEngine.getNextPeriodDateProjected(lastPeriodStart, cycleLength)
+            var ovulationDate = nextPeriodDate.minusDays(14)
+            var triggerTime = getTriggerTimeMillis(ovulationDate, 9, 0)
             
-            if (triggerTime > System.currentTimeMillis()) {
-                scheduleAlarm(
-                    context = context,
-                    id = ID_OVULATION_ALERT,
-                    triggerTimeMs = triggerTime,
-                    title = "Ovulation day 🌿",
-                    body = "Today is your ovulation day. You are at peak fertility and energy."
-                )
+            if (triggerTime <= System.currentTimeMillis()) {
+                // If current cycle ovulation is in the past, schedule for the next cycle's ovulation day
+                val nextNextPeriodDate = nextPeriodDate.plusDays(cycleLength.toLong())
+                ovulationDate = nextNextPeriodDate.minusDays(14)
+                triggerTime = getTriggerTimeMillis(ovulationDate, 9, 0)
             }
+            
+            Log.d(TAG, "Calculated ovulation alert date: $ovulationDate at 9:00 AM (Trigger Time: $triggerTime ms)")
+            scheduleAlarm(
+                context = context,
+                id = ID_OVULATION_ALERT,
+                triggerTimeMs = triggerTime,
+                title = "Ovulation day 🌿",
+                body = "Today is your ovulation day. You are at peak fertility and energy."
+            )
         } else {
+            Log.d(TAG, "Ovulation alert is disabled. Cancelling alarm.")
             cancelAlarm(context, ID_OVULATION_ALERT)
         }
 
@@ -90,7 +119,8 @@ object NotificationHelper {
                 // If past for today, schedule for tomorrow
                 triggerTime = getTriggerTimeMillis(LocalDate.now().plusDays(1), hour, minute)
             }
-
+            
+            Log.d(TAG, "Calculated Daily Log reminder repeating trigger: Hour = $hour, Minute = $minute (Trigger Time: $triggerTime ms)")
             scheduleRepeatingAlarm(
                 context = context,
                 id = ID_DAILY_LOG,
@@ -100,25 +130,33 @@ object NotificationHelper {
                 body = "Take 30 seconds to log your day in VelvetCycle."
             )
         } else {
+            Log.d(TAG, "Daily log reminder is disabled. Cancelling alarm.")
             cancelAlarm(context, ID_DAILY_LOG)
         }
 
         // 4. Pad Reminder: 2 days before predicted next period at 9:05 AM (offset slightly from period reminder)
         if (storageHelper.padReminderEnabled) {
-            val nextPeriodDate = lastPeriodStart.plusDays(cycleLength.toLong())
-            val reminderDate = nextPeriodDate.minusDays(2)
-            val triggerTime = getTriggerTimeMillis(reminderDate, 9, 5)
+            val nextPeriodDate = CycleEngine.getNextPeriodDateProjected(lastPeriodStart, cycleLength)
+            var reminderDate = nextPeriodDate.minusDays(2)
+            var triggerTime = getTriggerTimeMillis(reminderDate, 9, 5)
             
-            if (triggerTime > System.currentTimeMillis()) {
-                scheduleAlarm(
-                    context = context,
-                    id = ID_PAD_REMINDER,
-                    triggerTimeMs = triggerTime,
-                    title = "Stock up on pads 🛍️",
-                    body = "Your period is in 2 days. Make sure you have pads ready."
-                )
+            if (triggerTime <= System.currentTimeMillis()) {
+                // If 2 days before current projected period is already in the past, schedule for the next cycle
+                val nextNextPeriodDate = nextPeriodDate.plusDays(cycleLength.toLong())
+                reminderDate = nextNextPeriodDate.minusDays(2)
+                triggerTime = getTriggerTimeMillis(reminderDate, 9, 5)
             }
+            
+            Log.d(TAG, "Calculated pad reminder date: $reminderDate at 9:05 AM (Trigger Time: $triggerTime ms)")
+            scheduleAlarm(
+                context = context,
+                id = ID_PAD_REMINDER,
+                triggerTimeMs = triggerTime,
+                title = "Stock up on pads 🛍️",
+                body = "Your period is in 2 days. Make sure you have pads ready."
+            )
         } else {
+            Log.d(TAG, "Pad reminder is disabled. Cancelling alarm.")
             cancelAlarm(context, ID_PAD_REMINDER)
         }
 
@@ -129,38 +167,43 @@ object NotificationHelper {
             val dayBeforeDate = nextPeriodDate.minusDays(1)
 
             // Morning at 8:00 AM
-            val morningTriggerTime = getTriggerTimeMillis(dayBeforeDate, 8, 0)
-            if (morningTriggerTime > System.currentTimeMillis()) {
-                scheduleAlarm(
-                    context = context,
-                    id = ID_DAY_BEFORE_MORNING,
-                    triggerTimeMs = morningTriggerTime,
-                    title = com.example.constants.Translations.t("notif_day_before_morning_title", lang),
-                    body = com.example.constants.Translations.t("notif_day_before_morning_body", lang)
-                )
-            } else {
-                cancelAlarm(context, ID_DAY_BEFORE_MORNING)
+            var morningTriggerTime = getTriggerTimeMillis(dayBeforeDate, 8, 0)
+            if (morningTriggerTime <= System.currentTimeMillis()) {
+                val nextNextPeriodDate = nextPeriodDate.plusDays(cycleLength.toLong())
+                morningTriggerTime = getTriggerTimeMillis(nextNextPeriodDate.minusDays(1), 8, 0)
             }
+            
+            Log.d(TAG, "Calculated morning day-before period alert: ${dayBeforeDate} at 8:00 AM (Trigger Time: $morningTriggerTime ms)")
+            scheduleAlarm(
+                context = context,
+                id = ID_DAY_BEFORE_MORNING,
+                triggerTimeMs = morningTriggerTime,
+                title = com.example.constants.Translations.t("notif_day_before_morning_title", lang),
+                body = com.example.constants.Translations.t("notif_day_before_morning_body", lang)
+            )
 
             // Evening at 9:00 PM (21:00)
-            val eveningTriggerTime = getTriggerTimeMillis(dayBeforeDate, 21, 0)
-            if (eveningTriggerTime > System.currentTimeMillis()) {
-                scheduleAlarm(
-                    context = context,
-                    id = ID_DAY_BEFORE_EVENING,
-                    triggerTimeMs = eveningTriggerTime,
-                    title = com.example.constants.Translations.t("notif_day_before_evening_title", lang),
-                    body = com.example.constants.Translations.t("notif_day_before_evening_body", lang)
-                )
-            } else {
-                cancelAlarm(context, ID_DAY_BEFORE_EVENING)
+            var eveningTriggerTime = getTriggerTimeMillis(dayBeforeDate, 21, 0)
+            if (eveningTriggerTime <= System.currentTimeMillis()) {
+                val nextNextPeriodDate = nextPeriodDate.plusDays(cycleLength.toLong())
+                eveningTriggerTime = getTriggerTimeMillis(nextNextPeriodDate.minusDays(1), 21, 0)
             }
+            
+            Log.d(TAG, "Calculated evening day-before period alert: ${dayBeforeDate} at 9:00 PM (Trigger Time: $eveningTriggerTime ms)")
+            scheduleAlarm(
+                context = context,
+                id = ID_DAY_BEFORE_EVENING,
+                triggerTimeMs = eveningTriggerTime,
+                title = com.example.constants.Translations.t("notif_day_before_evening_title", lang),
+                body = com.example.constants.Translations.t("notif_day_before_evening_body", lang)
+            )
         } else {
+            Log.d(TAG, "Period reminder is disabled. Cancelling day-before alerts.")
             cancelAlarm(context, ID_DAY_BEFORE_MORNING)
             cancelAlarm(context, ID_DAY_BEFORE_EVENING)
         }
         
-        Log.d(TAG, "All notifications successfully scheduled/updated.")
+        Log.d(TAG, "All notifications successfully scheduled/updated with timezone safety.")
     }
 
     fun cancelAllNotifications(context: Context) {
@@ -190,6 +233,7 @@ object NotificationHelper {
         title: String,
         body: String
     ) {
+        Log.d(TAG, "scheduleAlarm invoked for ID: $id. Trigger time: $triggerTimeMs ms (${java.time.Instant.ofEpochMilli(triggerTimeMs)})")
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, NotificationReceiver::class.java).apply {
             putExtra("notif_id", id)
@@ -210,8 +254,9 @@ object NotificationHelper {
             } else {
                 alarmManager.set(AlarmManager.RTC_WAKEUP, triggerTimeMs, pendingIntent)
             }
+            Log.d(TAG, "Successfully registered single alarm ID: $id using AlarmManager.")
         } catch (e: Exception) {
-            Log.e(TAG, "Error scheduling alarm ID: $id", e)
+            Log.e(TAG, "Fatal error registering alarm ID: $id using AlarmManager", e)
         }
     }
 
@@ -223,6 +268,7 @@ object NotificationHelper {
         title: String,
         body: String
     ) {
+        Log.d(TAG, "scheduleRepeatingAlarm invoked for ID: $id. Trigger time: $triggerTimeMs ms. Interval: $intervalMs ms")
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, NotificationReceiver::class.java).apply {
             putExtra("notif_id", id)
@@ -244,12 +290,14 @@ object NotificationHelper {
                 intervalMs,
                 pendingIntent
             )
+            Log.d(TAG, "Successfully registered repeating alarm ID: $id using AlarmManager.")
         } catch (e: Exception) {
-            Log.e(TAG, "Error scheduling repeating alarm ID: $id", e)
+            Log.e(TAG, "Fatal error registering repeating alarm ID: $id using AlarmManager", e)
         }
     }
 
     private fun cancelAlarm(context: Context, id: Int) {
+        Log.d(TAG, "cancelAlarm invoked for ID: $id")
         try {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             val intent = Intent(context, NotificationReceiver::class.java)
@@ -262,6 +310,9 @@ object NotificationHelper {
             if (pendingIntent != null) {
                 alarmManager.cancel(pendingIntent)
                 pendingIntent.cancel()
+                Log.d(TAG, "Successfully cancelled and dismantled alarm ID: $id.")
+            } else {
+                Log.d(TAG, "No existing active alarm found for ID: $id when attempting to cancel.")
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error cancelling alarm ID: $id", e)
