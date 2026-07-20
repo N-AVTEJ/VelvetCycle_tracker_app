@@ -8,7 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Assignment
+import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.PictureAsPdf
@@ -138,7 +138,7 @@ fun InsightsScreen(
                         title = Translations.t("avg_period_duration", lang),
                         value = "$avgPeriod",
                         unit = "days",
-                        icon = Icons.Default.Assignment,
+                        icon = Icons.AutoMirrored.Filled.Assignment,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -289,7 +289,7 @@ fun InsightsScreen(
                             )
                         }
                         if (index < cycleHistory.size - 1) {
-                            Divider(color = colors.border, thickness = 0.5.dp)
+                            HorizontalDivider(color = colors.border, thickness = 0.5.dp)
                         }
                     }
                 }

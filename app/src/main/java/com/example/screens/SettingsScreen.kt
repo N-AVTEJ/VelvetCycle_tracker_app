@@ -125,7 +125,7 @@ fun SettingsScreen(
                         Text(text = backupStatusText, color = colors.textPrimary, fontSize = 14.sp, textAlign = TextAlign.Center)
                         Spacer(modifier = Modifier.height(16.dp))
                         LinearProgressIndicator(
-                            progress = backupProgress,
+                            progress = { backupProgress },
                             color = colors.pinkAccent,
                             trackColor = colors.pinkAccent.copy(alpha = 0.1f),
                             modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))
@@ -156,7 +156,7 @@ fun SettingsScreen(
                         Text(text = restoreStatusText, color = colors.textPrimary, fontSize = 14.sp, textAlign = TextAlign.Center)
                         Spacer(modifier = Modifier.height(16.dp))
                         LinearProgressIndicator(
-                            progress = restoreProgress,
+                            progress = { restoreProgress },
                             color = colors.pinkAccent,
                             trackColor = colors.pinkAccent.copy(alpha = 0.1f),
                             modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp))
@@ -256,7 +256,7 @@ fun SettingsScreen(
                         }
                     }
 
-                    Divider(color = colors.border, thickness = 0.5.dp)
+                    HorizontalDivider(color = colors.border, thickness = 0.5.dp)
 
                     // Edit cycle info
                     Button(
@@ -296,7 +296,7 @@ fun SettingsScreen(
                             rescheduleNotifications()
                         }
                     )
-                    Divider(color = colors.border, thickness = 0.5.dp)
+                    HorizontalDivider(color = colors.border, thickness = 0.5.dp)
                     NotificationToggleItem(
                         title = Translations.t("lbl_ovulation_alert", lang),
                         subtitle = Translations.t("lbl_ovulation_alert_sub", lang),
@@ -307,7 +307,7 @@ fun SettingsScreen(
                             rescheduleNotifications()
                         }
                     )
-                    Divider(color = colors.border, thickness = 0.5.dp)
+                    HorizontalDivider(color = colors.border, thickness = 0.5.dp)
                     Column {
                         NotificationToggleItem(
                             title = Translations.t("lbl_daily_log", lang),
@@ -357,7 +357,7 @@ fun SettingsScreen(
                             }
                         }
                     }
-                    Divider(color = colors.border, thickness = 0.5.dp)
+                    HorizontalDivider(color = colors.border, thickness = 0.5.dp)
                     NotificationToggleItem(
                         title = Translations.t("lbl_pad_reminder", lang),
                         subtitle = Translations.t("lbl_pad_reminder_sub", lang),
@@ -541,7 +541,7 @@ fun SettingsScreen(
                             }
                         }
 
-                        Divider(color = colors.border, thickness = 0.5.dp)
+                        HorizontalDivider(color = colors.border, thickness = 0.5.dp)
 
                         // Fingerprint toggle row
                         if (isBiometricHardwareAvailable) {
@@ -592,7 +592,7 @@ fun SettingsScreen(
                                 )
                             }
 
-                            Divider(color = colors.border, thickness = 0.5.dp)
+                            HorizontalDivider(color = colors.border, thickness = 0.5.dp)
                         }
 
                         // Disguise app toggle row

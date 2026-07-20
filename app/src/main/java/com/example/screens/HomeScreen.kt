@@ -528,7 +528,7 @@ fun HomeScreen(
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
-                Divider(color = colors.border, thickness = 0.5.dp)
+                HorizontalDivider(color = colors.border, thickness = 0.5.dp)
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // SECTION 2: Nutrition Guide
@@ -611,7 +611,7 @@ fun HomeScreen(
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
-                Divider(color = colors.border, thickness = 0.5.dp)
+                HorizontalDivider(color = colors.border, thickness = 0.5.dp)
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // SECTION 3: Exercise Guide
