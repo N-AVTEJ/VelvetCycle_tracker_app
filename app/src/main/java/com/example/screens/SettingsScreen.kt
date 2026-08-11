@@ -82,6 +82,7 @@ fun SettingsScreen(
     var showBackupDialog by remember { mutableStateOf(false) }
     var showRestoreDialog by remember { mutableStateOf(false) }
     var backupProgress by remember { mutableStateOf(0f) }
+    
     // Notification permission status
     var hasNotificationPermission by remember { mutableStateOf(false) }
     
