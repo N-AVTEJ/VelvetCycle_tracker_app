@@ -267,6 +267,14 @@ class StorageHelper(context: Context) {
         get() = getSecureBoolean("notif_period_reminder", true)
         set(value) = saveSecureBoolean("notif_period_reminder", value)
 
+    var periodReminderDaysBefore: Int
+        get() = getSecureInt("notif_period_days_before", 1)
+        set(value) = saveSecureInt("notif_period_days_before", value)
+
+    var periodReminderTime: String
+        get() = getSecureString("notif_period_time", "08:00")
+        set(value) = saveSecureString("notif_period_time", value)
+
     var ovulationAlertEnabled: Boolean
         get() = getSecureBoolean("notif_ovulation_alert", true)
         set(value) = saveSecureBoolean("notif_ovulation_alert", value)

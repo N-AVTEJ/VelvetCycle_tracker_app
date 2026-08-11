@@ -16,6 +16,13 @@ class NotificationReceiver : BroadcastReceiver() {
     private val TAG = "NotificationReceiver"
 
     override fun onReceive(context: Context, intent: Intent) {
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == "android.intent.action.QUICKBOOT_POWERON") {
+            Log.d(TAG, "Device booted. Rescheduling notifications.")
+            val storageHelper = StorageHelper(context)
+            NotificationHelper.scheduleAllNotifications(context, storageHelper)
+            return
+        }
+
         val id = intent.getIntExtra("notif_id", 0)
         val title = intent.getStringExtra("notif_title") ?: "VelvetCycle"
         val body = intent.getStringExtra("notif_body") ?: "Your cycle health update."

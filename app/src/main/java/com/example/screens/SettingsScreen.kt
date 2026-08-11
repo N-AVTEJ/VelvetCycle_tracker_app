@@ -60,6 +60,8 @@ fun SettingsScreen(
     
     // Notification toggles
     var periodReminder by remember { mutableStateOf(storageHelper.periodReminderEnabled) }
+    var periodReminderDaysBefore by remember { mutableStateOf(storageHelper.periodReminderDaysBefore) }
+    var periodReminderTime by remember { mutableStateOf(storageHelper.periodReminderTime) }
     var ovulationAlert by remember { mutableStateOf(storageHelper.ovulationAlertEnabled) }
     var dailyLogReminder by remember { mutableStateOf(storageHelper.dailyLogReminderEnabled) }
     var dailyLogTime by remember { mutableStateOf(storageHelper.dailyLogReminderTime) }
@@ -80,6 +82,20 @@ fun SettingsScreen(
     var showBackupDialog by remember { mutableStateOf(false) }
     var showRestoreDialog by remember { mutableStateOf(false) }
     var backupProgress by remember { mutableStateOf(0f) }
+    // Notification permission status
+    var hasNotificationPermission by remember { mutableStateOf(false) }
+    
+    LaunchedEffect(Unit) {
+        hasNotificationPermission = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.POST_NOTIFICATIONS
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        } else {
+            true
+        }
+    }
+    
     var backupStatusText by remember { mutableStateOf("") }
     var restoreProgress by remember { mutableStateOf(0f) }
     var restoreStatusText by remember { mutableStateOf("") }
@@ -286,16 +302,111 @@ fun SettingsScreen(
             // --- SECTION 2: NOTIFICATIONS ---
             SettingsSectionCard(title = Translations.t("section_notifications", lang)) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    NotificationToggleItem(
-                        title = Translations.t("lbl_period_reminder", lang),
-                        subtitle = Translations.t("lbl_period_reminder_sub", lang),
-                        checked = periodReminder,
-                        onCheckedChange = {
-                            periodReminder = it
-                            storageHelper.periodReminderEnabled = it
-                            rescheduleNotifications()
+                    // Permission Status Indicator
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Notification Permission",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.textPrimary
+                        )
+                        
+                        Text(
+                            text = if (hasNotificationPermission) "Granted" else "Denied",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (hasNotificationPermission) Color(0xFF4CAF50) else Color(0xFFF44336)
+                        )
+                    }
+                    
+                    HorizontalDivider(color = colors.border, thickness = 0.5.dp)
+                    
+                    Column {
+                        NotificationToggleItem(
+                            title = Translations.t("lbl_period_reminder", lang),
+                            subtitle = Translations.t("lbl_period_reminder_sub", lang),
+                            checked = periodReminder,
+                            onCheckedChange = {
+                                periodReminder = it
+                                storageHelper.periodReminderEnabled = it
+                                rescheduleNotifications()
+                            }
+                        )
+                        if (periodReminder) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            // Days Before Setting
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(colors.background)
+                                    .clickable {
+                                        val nextDays = if (periodReminderDaysBefore >= 3) 1 else periodReminderDaysBefore + 1
+                                        periodReminderDaysBefore = nextDays
+                                        storageHelper.periodReminderDaysBefore = nextDays
+                                        rescheduleNotifications()
+                                    }
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Remind me",
+                                    fontSize = 13.sp,
+                                    color = colors.textPrimary
+                                )
+                                Text(
+                                    text = if (periodReminderDaysBefore == 1) "1 day before" else "$periodReminderDaysBefore days before",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.pinkAccent
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            // Time Setting
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(colors.background)
+                                    .clickable {
+                                        val cal = java.util.Calendar.getInstance()
+                                        val parts = periodReminderTime.split(":")
+                                        val hour = parts.getOrNull(0)?.toIntOrNull() ?: 8
+                                        val minute = parts.getOrNull(1)?.toIntOrNull() ?: 0
+                                        
+                                        android.app.TimePickerDialog(context, { _, h, m ->
+                                            val newTime = String.format("%02d:%02d", h, m)
+                                            periodReminderTime = newTime
+                                            storageHelper.periodReminderTime = newTime
+                                            rescheduleNotifications()
+                                        }, hour, minute, true).show()
+                                    }
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = Translations.t("lbl_reminder_time", lang),
+                                    fontSize = 13.sp,
+                                    color = colors.textPrimary
+                                )
+                                Text(
+                                    text = periodReminderTime,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = colors.pinkAccent
+                                )
+                            }
                         }
-                    )
+                    }
                     HorizontalDivider(color = colors.border, thickness = 0.5.dp)
                     NotificationToggleItem(
                         title = Translations.t("lbl_ovulation_alert", lang),

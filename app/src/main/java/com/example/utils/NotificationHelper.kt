@@ -56,26 +56,34 @@ object NotificationHelper {
         
         Log.d(TAG, "User cycle info: lastPeriodStart = $lastPeriodStart, cycleLength = $cycleLength")
 
-        // 1. Period Reminder: 2 days before predicted next period date at 9:00 AM
+        // 1. Period Reminder
         if (storageHelper.periodReminderEnabled) {
+            val daysBefore = storageHelper.periodReminderDaysBefore
+            val timeParts = storageHelper.periodReminderTime.split(":")
+            val hour = timeParts.getOrNull(0)?.toIntOrNull() ?: 8
+            val minute = timeParts.getOrNull(1)?.toIntOrNull() ?: 0
+
             val nextPeriodDate = CycleEngine.getNextPeriodDateProjected(lastPeriodStart, cycleLength)
-            var reminderDate = nextPeriodDate.minusDays(2)
-            var triggerTime = getTriggerTimeMillis(reminderDate, 9, 0)
+            var reminderDate = nextPeriodDate.minusDays(daysBefore.toLong())
+            var triggerTime = getTriggerTimeMillis(reminderDate, hour, minute)
             
             if (triggerTime <= System.currentTimeMillis()) {
-                // If 2 days before the current projected period is already in the past, schedule for the next cycle
+                // If the reminder for the current cycle is in the past, schedule for the next cycle
                 val nextNextPeriodDate = nextPeriodDate.plusDays(cycleLength.toLong())
-                reminderDate = nextNextPeriodDate.minusDays(2)
-                triggerTime = getTriggerTimeMillis(reminderDate, 9, 0)
+                reminderDate = nextNextPeriodDate.minusDays(daysBefore.toLong())
+                triggerTime = getTriggerTimeMillis(reminderDate, hour, minute)
             }
             
-            Log.d(TAG, "Calculated period reminder date: $reminderDate at 9:00 AM (Trigger Time: $triggerTime ms)")
+            Log.d(TAG, "Calculated period reminder date: $reminderDate at $hour:$minute (Trigger Time: $triggerTime ms)")
+            
+            val dayText = if (daysBefore == 1) "tomorrow" else "in $daysBefore days"
+            
             scheduleAlarm(
                 context = context,
                 id = ID_PERIOD_REMINDER,
                 triggerTimeMs = triggerTime,
-                title = "Period coming soon 🌸",
-                body = "Your period is expected in 2 days. Take care of yourself."
+                title = "Period Reminder",
+                body = "Your period is expected $dayText. Make sure you're prepared."
             )
         } else {
             Log.d(TAG, "Period reminder is disabled. Cancelling alarm.")
@@ -160,48 +168,7 @@ object NotificationHelper {
             cancelAlarm(context, ID_PAD_REMINDER)
         }
 
-        // 5. Day Before Period notifications
-        if (storageHelper.periodReminderEnabled) {
-            val lang = storageHelper.appLanguage
-            val nextPeriodDate = CycleEngine.getNextPeriodDateProjected(lastPeriodStart, cycleLength)
-            val dayBeforeDate = nextPeriodDate.minusDays(1)
-
-            // Morning at 8:00 AM
-            var morningTriggerTime = getTriggerTimeMillis(dayBeforeDate, 8, 0)
-            if (morningTriggerTime <= System.currentTimeMillis()) {
-                val nextNextPeriodDate = nextPeriodDate.plusDays(cycleLength.toLong())
-                morningTriggerTime = getTriggerTimeMillis(nextNextPeriodDate.minusDays(1), 8, 0)
-            }
-            
-            Log.d(TAG, "Calculated morning day-before period alert: ${dayBeforeDate} at 8:00 AM (Trigger Time: $morningTriggerTime ms)")
-            scheduleAlarm(
-                context = context,
-                id = ID_DAY_BEFORE_MORNING,
-                triggerTimeMs = morningTriggerTime,
-                title = com.example.constants.Translations.t("notif_day_before_morning_title", lang),
-                body = com.example.constants.Translations.t("notif_day_before_morning_body", lang)
-            )
-
-            // Evening at 9:00 PM (21:00)
-            var eveningTriggerTime = getTriggerTimeMillis(dayBeforeDate, 21, 0)
-            if (eveningTriggerTime <= System.currentTimeMillis()) {
-                val nextNextPeriodDate = nextPeriodDate.plusDays(cycleLength.toLong())
-                eveningTriggerTime = getTriggerTimeMillis(nextNextPeriodDate.minusDays(1), 21, 0)
-            }
-            
-            Log.d(TAG, "Calculated evening day-before period alert: ${dayBeforeDate} at 9:00 PM (Trigger Time: $eveningTriggerTime ms)")
-            scheduleAlarm(
-                context = context,
-                id = ID_DAY_BEFORE_EVENING,
-                triggerTimeMs = eveningTriggerTime,
-                title = com.example.constants.Translations.t("notif_day_before_evening_title", lang),
-                body = com.example.constants.Translations.t("notif_day_before_evening_body", lang)
-            )
-        } else {
-            Log.d(TAG, "Period reminder is disabled. Cancelling day-before alerts.")
-            cancelAlarm(context, ID_DAY_BEFORE_MORNING)
-            cancelAlarm(context, ID_DAY_BEFORE_EVENING)
-        }
+        // Day Before Period notifications have been unified with the main Period Reminder logic
         
         Log.d(TAG, "All notifications successfully scheduled/updated with timezone safety.")
     }
