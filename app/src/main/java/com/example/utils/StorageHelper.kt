@@ -317,4 +317,25 @@ class StorageHelper(context: Context) {
     var wrongAttempts: Int
         get() = getSecureInt("pin_attempts", 0)
         set(value) = saveSecureInt("pin_attempts", value)
+
+    // --- SUBSCRIPTION & RAZORPAY PREFERENCES ---
+    var razorpayKeyId: String
+        get() = getSecureString("razorpay_key_id", "")
+        set(value) = saveSecureString("razorpay_key_id", value)
+
+    var monthlyPlanId: String
+        get() = getSecureString("monthly_plan_id", "")
+        set(value) = saveSecureString("monthly_plan_id", value)
+
+    var yearlyPlanId: String
+        get() = getSecureString("yearly_plan_id", "")
+        set(value) = saveSecureString("yearly_plan_id", value)
+
+    var isPremiumUser: Boolean
+        get() = getSecureBoolean("is_premium_user", false)
+        set(value) = saveSecureBoolean("is_premium_user", value)
+
+    var subscriptionPlan: String
+        get() = getSecureString("subscription_plan", "none")
+        set(value) = saveSecureString("subscription_plan", value)
 }
