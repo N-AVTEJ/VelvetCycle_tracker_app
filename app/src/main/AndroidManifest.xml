@@ -68,6 +68,12 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".SubscriptionActivity"
+            android:exported="true"
+            android:label="VelvetCycle Premium"
+            android:theme="@style/Theme.MyApplication" />
     </application>
 
 </manifest>

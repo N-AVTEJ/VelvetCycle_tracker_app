@@ -2,6 +2,7 @@ package com.example.screens
 
 import android.app.AlertDialog
 import android.app.TimePickerDialog
+import android.content.Intent
 import android.widget.Toast
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
@@ -293,6 +294,34 @@ fun SettingsScreen(
                         Text(
                             text = Translations.t("lbl_edit_cycle", lang),
                             color = colors.pinkAccent,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+
+                    HorizontalDivider(color = colors.border, thickness = 0.5.dp)
+
+                    // Subscription Pass Button
+                    Button(
+                        onClick = {
+                            val intent = Intent(context, com.example.SubscriptionActivity::class.java)
+                            context.startActivity(intent)
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.pinkAccent),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("btn_open_subscription_activity")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                        Text(
+                            text = if (storageHelper.isPremiumUser) "Manage Premium Subscription 🌸" else "Get VelvetCycle Premium 🌸",
+                            color = Color.White,
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
                         )
