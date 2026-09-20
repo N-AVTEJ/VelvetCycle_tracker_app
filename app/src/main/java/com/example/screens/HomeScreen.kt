@@ -221,7 +221,7 @@ fun HomeScreen(
                         val shopZeptoLabel = if (lang == "हिंदी") "जेप्टो से मंगवाएं" else if (lang == "తెలుగు") "జెప్టో ప్యాడ్స్" else "Order on Zepto"
 
                         Button(
-                            onClick = { com.example.utils.StoreLinks.openStore(context, com.example.utils.StoreLinks.BLINKIT_KEY) },
+                            onClick = { com.example.utils.StoreLinks.openStore(context, "blinkit") },
                             colors = ButtonDefaults.buttonColors(containerColor = colors.pinkAccent),
                             modifier = Modifier.weight(1f).testTag("shop_blinkit_button"),
                             shape = RoundedCornerShape(12.dp)
@@ -230,7 +230,7 @@ fun HomeScreen(
                         }
 
                         Button(
-                            onClick = { com.example.utils.StoreLinks.openStore(context, com.example.utils.StoreLinks.ZEPTO_KEY) },
+                            onClick = { com.example.utils.StoreLinks.openStore(context, "zepto") },
                             colors = ButtonDefaults.buttonColors(containerColor = colors.textPrimary),
                             modifier = Modifier.weight(1f).testTag("shop_zepto_button"),
                             shape = RoundedCornerShape(12.dp)

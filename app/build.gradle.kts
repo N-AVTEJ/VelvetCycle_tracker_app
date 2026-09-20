@@ -136,4 +136,5 @@ dependencies {
   "ksp"(libs.androidx.room.compiler)
   "ksp"(libs.moshi.kotlin.codegen)
   implementation("androidx.biometric:biometric:1.1.0")
+  implementation("androidx.browser:browser:1.8.0")
 }

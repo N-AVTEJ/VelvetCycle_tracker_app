@@ -1,5 +1,9 @@
 package com.example.screens
 
+import android.util.Log
+import android.widget.Toast
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -12,17 +16,23 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Fingerprint
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.fragment.app.FragmentActivity
 import com.example.LocalAppLanguage
 import com.example.constants.Translations
 import com.example.ui.theme.FertileGreen
@@ -30,6 +40,7 @@ import com.example.ui.theme.LocalVelvetColors
 import com.example.ui.theme.SecondaryPink
 import com.example.ui.theme.Teal
 import com.example.utils.StorageHelper
+import kotlinx.coroutines.delay
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
@@ -40,9 +51,17 @@ import java.time.temporal.ChronoUnit
 fun CalendarScreen(
     storageHelper: StorageHelper
 ) {
+    val context = LocalContext.current
     val colors = LocalVelvetColors.current
     val lang = LocalAppLanguage.current
     
+    // Biometric Security state
+    var isUnlocked by remember { mutableStateOf(false) }
+    var authErrorMsg by mutableStateOf<String?>(null)
+    var showPinFallbackDialog by remember { mutableStateOf(false) }
+    var enteredPin by remember { mutableStateOf("") }
+    var pinError by mutableStateOf(false)
+
     var currentMonth by remember { mutableStateOf(YearMonth.now()) }
     var selectedDate by remember { mutableStateOf<LocalDate?>(LocalDate.now()) }
 
@@ -68,6 +87,56 @@ fun CalendarScreen(
     val daysInMonth = currentMonth.lengthOfMonth()
     val startShift = firstDayOfMonth.dayOfWeek.value - 1 // Monday-start shifts
 
+    val triggerBiometricAuth = {
+        val activity = context as? FragmentActivity
+        if (activity != null) {
+            val executor = ContextCompat.getMainExecutor(context)
+            val biometricPrompt = BiometricPrompt(
+                activity,
+                executor,
+                object : BiometricPrompt.AuthenticationCallback() {
+                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                        super.onAuthenticationError(errorCode, errString)
+                        Log.d("CalendarScreen", "Biometric error ($errorCode): $errString")
+                        authErrorMsg = errString.toString()
+                    }
+
+                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                        super.onAuthenticationSucceeded(result)
+                        isUnlocked = true
+                        authErrorMsg = null
+                        Toast.makeText(context, if (lang == "हिंदी") "कैलेंडर अनलॉक हुआ! 🔓" else "Calendar unlocked! 🔓", Toast.LENGTH_SHORT).show()
+                    }
+
+                    override fun onAuthenticationFailed() {
+                        super.onAuthenticationFailed()
+                        authErrorMsg = if (lang == "हिंदी") "बायोमेट्रिक सत्यापन विफल रहा" else if (lang == "తెలుగు") "ధృవీకరణ విఫలమైంది" else "Authentication failed. Try again."
+                    }
+                }
+            )
+
+            val promptTitle = if (lang == "हिंदी") "स्वास्थ्य डेटा अनलॉक करें" else if (lang == "తెలుగు") "ఆరోగ్య డేటాను అన్‌లాక్ చేయండి" else "Unlock Health Data"
+            val promptSubtitle = if (lang == "हिंदी") "चक्र कैलेंडर देखने के लिए अपनी उंगली या चेहरे का उपयोग करें" else if (lang == "తెలుగు") "క్యాలెండర్ చూడటానికి వేలిముద్ర లేదా ఫేస్ ఉపయోగించండి" else "Use fingerprint or face unlock to view cycle calendar"
+            val promptNegative = if (lang == "हिंदी") "पिन / रद्द करें" else if (lang == "తెలుగు") "పిన్ / రద్దు" else "Cancel / Use PIN"
+
+            val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                .setTitle(promptTitle)
+                .setSubtitle(promptSubtitle)
+                .setNegativeButtonText(promptNegative)
+                .build()
+
+            biometricPrompt.authenticate(promptInfo)
+        }
+    }
+
+    // Automatically trigger biometric unlock prompt when calendar is opened
+    LaunchedEffect(Unit) {
+        if (!isUnlocked) {
+            delay(250)
+            triggerBiometricAuth()
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -77,43 +146,291 @@ fun CalendarScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // Title Header
+        // Title Header & Lock Toggle
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp),
+                .padding(vertical = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.SpaceBetween
         ) {
-            Icon(
-                imageVector = Icons.Default.CalendarMonth,
-                contentDescription = null,
-                tint = colors.pinkAccent,
-                modifier = Modifier.size(28.dp)
-            )
-            Text(
-                text = calendarHeaderLabel,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                color = colors.textPrimary
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.CalendarMonth,
+                    contentDescription = null,
+                    tint = colors.pinkAccent,
+                    modifier = Modifier.size(28.dp)
+                )
+                Text(
+                    text = calendarHeaderLabel,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary
+                )
+            }
+
+            if (isUnlocked) {
+                IconButton(
+                    onClick = { isUnlocked = false },
+                    modifier = Modifier.testTag("btn_lock_calendar")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = "Lock Calendar",
+                        tint = colors.pinkAccent
+                    )
+                }
+            }
         }
 
-        // Calendar Grid Card
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .testTag("calendar_grid_card"),
-            colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
-            shape = RoundedCornerShape(16.dp),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Column(
+        if (!isUnlocked) {
+            // BIOMETRIC SECURITY LOCK SCREEN
+            Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .testTag("calendar_biometric_lock_card"),
+                colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
+                shape = RoundedCornerShape(20.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
             ) {
-                // Month Selector
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(72.dp)
+                            .clip(CircleShape)
+                            .background(colors.pinkAccent.copy(alpha = 0.15f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Fingerprint,
+                            contentDescription = null,
+                            tint = colors.pinkAccent,
+                            modifier = Modifier.size(44.dp)
+                        )
+                    }
+
+                    Text(
+                        text = if (lang == "हिंदी") "स्वास्थ्य डेटा सुरक्षित है 🔒" else if (lang == "తెలుగు") "ఆరోగ్య డేటా సురక్షితం 🔒" else "Protected Health Data 🔒",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Text(
+                        text = if (lang == "हिंदी") "कैलेंडर स्वास्थ्य डेटा देखने के लिए androidx.biometric का उपयोग करके फ़िंगरप्रिंट या चेहरे का सत्यापन आवश्यक है।"
+                        else if (lang == "తెలుగు") "క్యాలెండర్ వివరాలను చూడటానికి androidx.biometric ద్వారా వేలిముద్ర లేదా ఫేస్ అన్‌లాక్ అవసరం."
+                        else "Fingerprint or face unlock is required via androidx.biometric before displaying your sensitive menstrual calendar.",
+                        fontSize = 13.sp,
+                        color = colors.textSecondary,
+                        textAlign = TextAlign.Center
+                    )
+
+                    if (authErrorMsg != null) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.errorContainer,
+                            shape = RoundedCornerShape(8.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = authErrorMsg!!,
+                                color = MaterialTheme.colorScheme.onErrorContainer,
+                                fontSize = 12.sp,
+                                modifier = Modifier.padding(10.dp),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Button(
+                        onClick = { triggerBiometricAuth() },
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.pinkAccent),
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(48.dp)
+                            .testTag("btn_unlock_biometrics")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Fingerprint,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (lang == "हिंदी") "बायोमेट्रिक (फ़िंगरप्रिंट / फ़ेस) से अनलॉक करें" else if (lang == "తెలుగు") "బయోమెట్రిక్ తో అన్‌లాక్ చేయండి" else "Unlock with Fingerprint / Face",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 14.sp
+                        )
+                    }
+
+                    if (storageHelper.userPin != null) {
+                        OutlinedButton(
+                            onClick = { showPinFallbackDialog = true },
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(44.dp)
+                                .testTag("btn_pin_fallback")
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = null,
+                                tint = colors.pinkAccent,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = if (lang == "हिंदी") "सुरक्षा पिन दर्ज करें" else "Enter Security PIN",
+                                color = colors.pinkAccent,
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 13.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            // PIN Fallback Dialog if requested
+            if (showPinFallbackDialog) {
+                AlertDialog(
+                    onDismissRequest = {
+                        showPinFallbackDialog = false
+                        enteredPin = ""
+                        pinError = false
+                    },
+                    icon = {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = colors.pinkAccent,
+                            modifier = Modifier.size(36.dp)
+                        )
+                    },
+                    title = {
+                        Text(
+                            text = if (lang == "हिंदी") "सुरक्षा पिन दर्ज करें" else "Enter Security PIN",
+                            fontWeight = FontWeight.Bold
+                        )
+                    },
+                    text = {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = if (lang == "हिंदी") "कैलेंडर देखने के लिए अपना 4-अंकीय पिन दर्ज करें:" else "Enter your 4-digit PIN to access the calendar:",
+                                fontSize = 13.sp,
+                                color = colors.textSecondary
+                            )
+                            OutlinedTextField(
+                                value = enteredPin,
+                                onValueChange = {
+                                    if (it.length <= 4) {
+                                        enteredPin = it
+                                        pinError = false
+                                    }
+                                },
+                                singleLine = true,
+                                isError = pinError,
+                                placeholder = { Text("****") },
+                                modifier = Modifier.testTag("input_fallback_pin")
+                            )
+                            if (pinError) {
+                                Text(
+                                    text = if (lang == "हिंदी") "गलत पिन!" else "Incorrect PIN!",
+                                    color = MaterialTheme.colorScheme.error,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    },
+                    confirmButton = {
+                        Button(
+                            onClick = {
+                                if (enteredPin == storageHelper.userPin) {
+                                    isUnlocked = true
+                                    showPinFallbackDialog = false
+                                    enteredPin = ""
+                                    pinError = false
+                                } else {
+                                    pinError = true
+                                }
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = colors.pinkAccent),
+                            modifier = Modifier.testTag("btn_confirm_fallback_pin")
+                        ) {
+                            Text("Unlock", color = Color.White)
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = {
+                            showPinFallbackDialog = false
+                            enteredPin = ""
+                            pinError = false
+                        }) {
+                            Text("Cancel", color = colors.textSecondary)
+                        }
+                    }
+                )
+            }
+        } else {
+            // UNLOCKED STATE: Show Security Banner and Calendar grid
+            Surface(
+                color = Color(0xFFE8F5E9),
+                shape = RoundedCornerShape(10.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("unlocked_health_banner")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.LockOpen,
+                        contentDescription = null,
+                        tint = Color(0xFF2E7D32),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Text(
+                        text = if (lang == "हिंदी") "स्वास्थ्य डेटा सुरक्षित रूप से अनलॉक किया गया (androidx.biometric)" else "Health Data Authenticated via androidx.biometric",
+                        fontSize = 12.sp,
+                        color = Color(0xFF1B5E20),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+
+            // Calendar Grid Card
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("calendar_grid_card"),
+                colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
+                shape = RoundedCornerShape(16.dp),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    // Month Selector
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -471,6 +788,7 @@ fun CalendarScreen(
             }
         }
     }
+}
 }
 
 private fun isPeriodDay(date: LocalDate, lastPeriodStart: LocalDate, cycleLength: Int, periodDuration: Int): Boolean {

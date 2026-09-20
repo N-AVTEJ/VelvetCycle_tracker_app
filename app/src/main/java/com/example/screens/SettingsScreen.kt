@@ -802,11 +802,7 @@ fun SettingsScreen(
                         stores.forEach { (storeKey, icon) ->
                             val isSelected = selectedStore == storeKey
                             val storeName = if (storeKey == "blinkit") Translations.t("store_blinkit", lang) else Translations.t("store_zepto", lang)
-                            val borderColor = if (isSelected) {
-                                if (storeKey == "blinkit") Color(0xFFF5C518) else Color(0xFF7B2FF7)
-                            } else {
-                                colors.border
-                            }
+                            val borderColor = if (isSelected) colors.pinkAccent else colors.border
                             val borderWidth = if (isSelected) 2.dp else 1.dp
                             
                             Box(
@@ -821,9 +817,8 @@ fun SettingsScreen(
                                         shape = RoundedCornerShape(12.dp)
                                     )
                                     .clickable {
-                                        val newStore = if (isSelected) "" else storeKey
-                                        selectedStore = newStore
-                                        storageHelper.padStore = newStore
+                                        selectedStore = storeKey
+                                        storageHelper.padStore = storeKey
                                     }
                                     .testTag("settings_store_$storeKey")
                                     .padding(horizontal = 8.dp, vertical = 12.dp),
