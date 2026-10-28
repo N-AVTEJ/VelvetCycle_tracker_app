@@ -117,6 +117,12 @@ object Translations {
             "btn_restore" to "Restore from Google Drive",
             "btn_delete_data" to "Delete all my data",
             
+            "pin_header_unlock" to "Enter your PIN",
+            "pin_header_setup" to "Create a PIN",
+            "pin_header_confirm" to "Confirm your PIN",
+            "pin_header_change" to "Enter current PIN",
+            "pin_try_again_in" to "Try again in ",
+            
             "onboarding_q1" to "What is your name?",
             "onboarding_q2" to "When did your last period start?",
             "onboarding_q3" to "How many days does your period usually last?",
@@ -269,6 +275,12 @@ object Translations {
             "btn_restore" to "गूगल ड्राइव से पुनर्स्थापित करें",
             "btn_delete_data" to "मेरा सारा डेटा हटाएं",
             
+            "pin_header_unlock" to "अनलॉक करने के लिए पिन दर्ज करें",
+            "pin_header_setup" to "पिन बनाएं",
+            "pin_header_confirm" to "पिन की पुष्टि करें",
+            "pin_header_change" to "वर्तमान पिन दर्ज करें",
+            "pin_try_again_in" to "पुनः प्रयास करें ",
+            
             "onboarding_q1" to "आपका नाम क्या है?",
             "onboarding_q2" to "आपका पिछला मासिक धर्म कब शुरू हुआ था?",
             "onboarding_q3" to "आपका मासिक धर्म आमतौर पर कितने दिनों तक चलता है?",
@@ -420,6 +432,12 @@ object Translations {
             "btn_backup" to "గూగుల్ డ్రైవ్‌కు బ్యాకప్ చేయి",
             "btn_restore" to "గూగుల్ డ్రైవ్ నుండి రీస్టోర్ చేయి",
             "btn_delete_data" to "నా డేటా మొత్తం తొలగించు",
+            
+            "pin_header_unlock" to "అన్‌లాక్ చేయడానికి పిన్ నమోదు చేయండి",
+            "pin_header_setup" to "పిన్ సృష్టించండి",
+            "pin_header_confirm" to "పిన్‌ని నిర్ధారించండి",
+            "pin_header_change" to "ప్రస్తుత పిన్ నమోదు చేయండి",
+            "pin_try_again_in" to "మళ్లీ ప్రయత్నించండి ",
             
             "onboarding_q1" to "మీ పేరు ఏమిటి?",
             "onboarding_q2" to "మీ చివరి పీరియడ్ ఎప్పుడు ప్రారంభమైంది?",

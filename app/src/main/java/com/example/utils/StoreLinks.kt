@@ -25,8 +25,11 @@ object StoreLinks {
         }
 
         try {
-            val customTabsIntent = CustomTabsIntent.Builder()
+            val colorParams = androidx.browser.customtabs.CustomTabColorSchemeParams.Builder()
                 .setToolbarColor(android.graphics.Color.parseColor("#D4537E"))
+                .build()
+            val customTabsIntent = CustomTabsIntent.Builder()
+                .setDefaultColorSchemeParams(colorParams)
                 .setShowTitle(true)
                 .build()
             customTabsIntent.launchUrl(context, Uri.parse(url))

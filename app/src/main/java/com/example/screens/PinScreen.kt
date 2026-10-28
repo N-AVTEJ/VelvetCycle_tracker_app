@@ -36,16 +36,28 @@ import com.example.utils.StorageHelper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-sealed class PinMode {
-    object Verify : PinMode()
-    object Setup : PinMode()
-    data class Confirm(val firstPin: String) : PinMode()
-    object Change : PinMode()
+sealed class PinMode(val key: String) {
+    object Verify : PinMode("unlock")
+    object Setup : PinMode("setup")
+    data class Confirm(val firstPin: String) : PinMode("confirm")
+    object Change : PinMode("change")
+
+    companion object {
+        fun fromString(mode: String?): PinMode {
+            return when (mode?.lowercase()) {
+                "setup" -> Setup
+                "confirm" -> Confirm("")
+                "change" -> Change
+                else -> Verify
+            }
+        }
+    }
 }
 
 @Composable
 fun PinScreen(
     storageHelper: StorageHelper,
+    mode: String? = null,
     initialMode: PinMode = PinMode.Verify,
     onUnlocked: () -> Unit = {},
     onSetupComplete: () -> Unit = {},
@@ -57,7 +69,10 @@ fun PinScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var currentMode by remember { mutableStateOf(initialMode) }
+    val startingMode = remember(mode, initialMode) {
+        if (mode != null) PinMode.fromString(mode) else initialMode
+    }
+    var currentMode by remember { mutableStateOf(startingMode) }
     var enteredDigits by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
     var isShaking by remember { mutableStateOf(false) }
@@ -302,12 +317,16 @@ fun PinScreen(
                                 }
                             }
                             is PinMode.Change -> {
-                                // For Change mode: save pin and complete
-                                flashSuccess = true
-                                storageHelper.userPin = pin
-                                delay(400)
-                                flashSuccess = false
-                                onSetupComplete()
+                                val savedPin = storageHelper.userPin
+                                if (savedPin == null || savedPin == pin) {
+                                    flashSuccess = true
+                                    delay(400)
+                                    flashSuccess = false
+                                    currentMode = PinMode.Setup
+                                    errorMessage = ""
+                                } else {
+                                    handleWrongAttempt()
+                                }
                             }
                         }
                     }
@@ -587,10 +606,10 @@ fun PinScreen(
     } else {
         // --- BEAUTIFUL STANDARD VELVETCYCLE PIN DESIGN ---
         val headerText = when (currentMode) {
-            is PinMode.Verify -> if (lang == "हिंदी") "अनलॉक करने के लिए पिन दर्ज करें" else if (lang == "తెలుగు") "అన్‌లాక్ చేయడానికి పిన్ నమోదు చేయండి" else "Enter your PIN"
-            is PinMode.Setup -> if (lang == "हिंदी") "पिन बनाएं" else if (lang == "తెలుగు") "పిన్ సృష్టించండి" else "Create a PIN"
-            is PinMode.Confirm -> if (lang == "हिंदी") "पिन की पुष्टि करें" else if (lang == "తెలుగు") "పిన్‌ని నిర్ధారించండి" else "Confirm your PIN"
-            is PinMode.Change -> if (lang == "हिंदी") "नया पिन दर्ज करें" else if (lang == "తెలుగు") "కొత్త పిన్ నమోదు చేయండి" else "Enter new PIN"
+            is PinMode.Verify -> com.example.constants.Translations.t("pin_header_unlock", lang)
+            is PinMode.Setup -> com.example.constants.Translations.t("pin_header_setup", lang)
+            is PinMode.Confirm -> com.example.constants.Translations.t("pin_header_confirm", lang)
+            is PinMode.Change -> com.example.constants.Translations.t("pin_header_change", lang)
         }
 
         val subTitleLabel = if (lang == "हिंदी") "आपका सुरक्षित चक्र साथी" else if (lang == "తెలుగు") "మీ సురక్షిత సైకిల్ గైడ్" else "YOUR INTIMATE HEALTH PARTNER"
@@ -690,10 +709,10 @@ fun PinScreen(
                         modifier = Modifier.padding(bottom = 8.dp)
                     ) {
                         NumberPad(
-                            onDigitClick = onDigitPressed,
-                            onDeleteClick = onBackspacePressed,
-                            showBiometric = (currentMode == PinMode.Verify && storageHelper.biometricEnabled && isBiometricHardwareAvailable),
-                            onBiometricClick = { triggerBiometricAuth() }
+                            onPress = onDigitPressed,
+                            onDelete = onBackspacePressed,
+                            biometricEnabled = (currentMode == PinMode.Verify && storageHelper.biometricEnabled && isBiometricHardwareAvailable),
+                            onBiometric = { triggerBiometricAuth() }
                         )
 
                         // Action links / buttons at bottom

@@ -29,12 +29,21 @@ import com.example.ui.theme.LocalVelvetColors
 
 @Composable
 fun NumberPad(
-    onDigitClick: (String) -> Unit,
-    onDeleteClick: () -> Unit,
+    onPress: ((String) -> Unit)? = null,
+    onDelete: (() -> Unit)? = null,
+    onBiometric: (() -> Unit)? = null,
+    biometricEnabled: Boolean = false,
+    onDigitClick: ((String) -> Unit)? = null,
+    onDeleteClick: (() -> Unit)? = null,
     onBiometricClick: (() -> Unit)? = null,
     showBiometric: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val handleDigit: (String) -> Unit = onPress ?: onDigitClick ?: {}
+    val handleDelete: () -> Unit = onDelete ?: onDeleteClick ?: {}
+    val handleBiometric: (() -> Unit)? = onBiometric ?: onBiometricClick
+    val isBiometricActive: Boolean = biometricEnabled || showBiometric
+
     val keys = listOf(
         listOf("1", "2", "3"),
         listOf("4", "5", "6"),
@@ -57,7 +66,7 @@ fun NumberPad(
                     NumberButton(
                         digit = digit,
                         letters = getLettersForDigit(digit),
-                        onClick = { onDigitClick(digit) }
+                        onClick = { handleDigit(digit) }
                     )
                 }
             }
@@ -69,7 +78,7 @@ fun NumberPad(
             modifier = Modifier.wrapContentSize()
         ) {
             // Biometric button (or spacer)
-            if (showBiometric && onBiometricClick != null) {
+            if (isBiometricActive && handleBiometric != null) {
                 NumberButtonIcon(
                     icon = {
                         Icon(
@@ -78,7 +87,7 @@ fun NumberPad(
                             modifier = Modifier.size(28.dp)
                         )
                     },
-                    onClick = onBiometricClick,
+                    onClick = handleBiometric,
                     testTag = "pin_btn_biometric"
                 )
             } else {
@@ -89,7 +98,7 @@ fun NumberPad(
             NumberButton(
                 digit = "0",
                 letters = "",
-                onClick = { onDigitClick("0") }
+                onClick = { handleDigit("0") }
             )
 
             // Backspace button
@@ -101,7 +110,7 @@ fun NumberPad(
                         modifier = Modifier.size(24.dp)
                     )
                 },
-                onClick = onDeleteClick,
+                onClick = handleDelete,
                 testTag = "pin_btn_backspace"
             )
         }

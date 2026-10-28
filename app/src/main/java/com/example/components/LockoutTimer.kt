@@ -68,7 +68,7 @@ fun LockoutTimer(
         )
 
         // MM:SS Countdown
-        val labelText = if (lang == "हिंदी") "पुनः प्रयास करें " else if (lang == "తెలుగు") "మళ్లీ ప్రయత్నించండి " else "Try again in "
+        val labelText = com.example.constants.Translations.t("pin_try_again_in", lang)
         Text(
             text = "$labelText$formattedTime",
             fontSize = 18.sp,
