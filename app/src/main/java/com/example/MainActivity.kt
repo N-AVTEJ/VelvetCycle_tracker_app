@@ -48,6 +48,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.example.screens.CalendarScreen
+import com.example.utils.AppLock
 import com.example.screens.HomeScreen
 import com.example.screens.InsightsScreen
 import com.example.screens.LogScreen
@@ -106,7 +107,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
             when (event) {
                 Lifecycle.Event.ON_STOP -> {
                     if (storageHelper.userPin != null) {
-                        storageHelper.backgroundedAt = System.currentTimeMillis()
+                        AppLock.saveBackgroundTime(storageHelper)
                     }
                     // Instantly show the privacy background to protect content in App Switcher
                     showPrivacyOverlay = true
@@ -115,7 +116,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                     showPrivacyOverlay = false
                     if (storageHelper.userPin != null && isUnlockedState) {
                         val bgTime = storageHelper.backgroundedAt
-                        if (bgTime > 0 && System.currentTimeMillis() - bgTime >= 2 * 60 * 1000L) {
+                        if (AppLock.shouldLock(bgTime)) {
                             // Lock automatically after 2 minutes in background
                             isUnlockedState = false
                         }
@@ -138,6 +139,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                 storageHelper = storageHelper,
                                 initialMode = com.example.screens.PinMode.Verify,
                                 onUnlocked = { 
+                                    AppLock.clearBackgroundTime(storageHelper)
                                     isUnlockedState = true 
                                     resetInactivityTimer()
                                 },
@@ -156,7 +158,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                         }
 
                         if (showPrivacyOverlay) {
-                            PrivacyOverlay()
+                            PrivacyOverlay(isDisguised = storageHelper.disguiseMode)
                         }
                     }
                 }
@@ -181,21 +183,38 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
 }
 
 @Composable
-fun PrivacyOverlay() {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(androidx.compose.ui.graphics.Color(0xFFD4537E))
-            .testTag("privacy_overlay"),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = "VelvetCycle",
-            fontSize = 32.sp,
-            fontWeight = FontWeight.Bold,
-            color = androidx.compose.ui.graphics.Color.White,
-            letterSpacing = 1.sp
-        )
+fun PrivacyOverlay(isDisguised: Boolean = false) {
+    if (isDisguised) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(androidx.compose.ui.graphics.Color(0xFF121214))
+                .testTag("privacy_overlay"),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Calculator",
+                fontSize = 28.sp,
+                fontWeight = FontWeight.Medium,
+                color = androidx.compose.ui.graphics.Color(0xFF9E9EA7)
+            )
+        }
+    } else {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(androidx.compose.ui.graphics.Color(0xFFD4537E))
+                .testTag("privacy_overlay"),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "VelvetCycle",
+                fontSize = 32.sp,
+                fontWeight = FontWeight.Bold,
+                color = androidx.compose.ui.graphics.Color.White,
+                letterSpacing = 1.sp
+            )
+        }
     }
 }
 

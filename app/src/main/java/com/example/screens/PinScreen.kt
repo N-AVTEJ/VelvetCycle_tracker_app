@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.example.LocalAppLanguage
+import com.example.components.CalculatorDisguise
 import com.example.components.LockoutTimer
 import com.example.components.NumberPad
 import com.example.components.PinDots
@@ -81,10 +82,6 @@ fun PinScreen(
     val lockoutDuration = storageHelper.lockoutDuration
     var showEmergencyConfirm by remember { mutableStateOf(false) }
 
-    // Calculator state (for disguise mode)
-    var calcExpression by remember { mutableStateOf("") }
-    var calcResult by remember { mutableStateOf("") }
-
     // Lockout countdown loop
     LaunchedEffect(key1 = lockoutTimeLeft) {
         if (lockoutTimeLeft > 0) {
@@ -94,9 +91,6 @@ fun PinScreen(
             }
             storageHelper.clearLockout()
             errorMessage = ""
-            if (calcResult.startsWith("LOCKED") || calcResult.startsWith("Locked")) {
-                calcResult = ""
-            }
         }
     }
 
@@ -116,6 +110,7 @@ fun PinScreen(
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                         super.onAuthenticationSucceeded(result)
                         storageHelper.clearLockout()
+                        com.example.utils.AppLock.clearBackgroundTime(storageHelper)
                         onUnlocked()
                     }
 
@@ -156,78 +151,6 @@ fun PinScreen(
         canAuth == BiometricManager.BIOMETRIC_SUCCESS
     }
 
-    // Mathematical Evaluator for Calculator
-    val evaluateMathExpression = { expr: String ->
-        if (expr.isEmpty()) ""
-        else {
-            try {
-                val cleanExpr = expr.replace("×", "*").replace("÷", "/")
-                val tokens = mutableListOf<String>()
-                var currentNumber = StringBuilder()
-
-                for (char in cleanExpr) {
-                    if (char in '0'..'9' || char == '.') {
-                        currentNumber.append(char)
-                    } else if (char in listOf('+', '-', '*', '/')) {
-                        if (currentNumber.isNotEmpty()) {
-                            tokens.add(currentNumber.toString())
-                            currentNumber = StringBuilder()
-                        }
-                        tokens.add(char.toString())
-                    }
-                }
-                if (currentNumber.isNotEmpty()) {
-                    tokens.add(currentNumber.toString())
-                }
-
-                if (tokens.isEmpty()) ""
-                else {
-                    var i = 0
-                    while (i < tokens.size) {
-                        if (tokens[i] == "*" || tokens[i] == "/") {
-                            val op = tokens[i]
-                            val prev = tokens.getOrNull(i - 1)?.toDoubleOrNull()
-                            val next = tokens.getOrNull(i + 1)?.toDoubleOrNull()
-                            if (prev != null && next != null) {
-                                val result = if (op == "*") prev * next else prev / next
-                                tokens[i - 1] = result.toString()
-                                tokens.removeAt(i)
-                                tokens.removeAt(i)
-                                i--
-                            } else {
-                                "Error"
-                            }
-                        } else {
-                            i++
-                        }
-                    }
-
-                    var total = tokens.getOrNull(0)?.toDoubleOrNull() ?: 0.0
-                    i = 1
-                    while (i < tokens.size) {
-                        val op = tokens[i]
-                        val next = tokens.getOrNull(i + 1)?.toDoubleOrNull()
-                        if (next != null) {
-                            total = if (op == "+") total + next else total - next
-                            i += 2
-                        } else {
-                            break
-                        }
-                    }
-
-                    val intValue = total.toLong()
-                    if (total == intValue.toDouble()) {
-                        intValue.toString()
-                    } else {
-                        String.format("%.4f", total).trimEnd('0').trimEnd('.')
-                    }
-                }
-            } catch (e: Exception) {
-                "Error"
-            }
-        }
-    }
-
     // Handles Wrong Attempts with Tiers
     val handleWrongAttempt = {
         val attempts = storageHelper.wrongAttempts + 1
@@ -237,27 +160,22 @@ fun PinScreen(
             storageHelper.setLockout(24 * 60 * 60 * 1000L) // 24 hours
             lockoutTimeLeft = storageHelper.getLockoutTimeRemaining()
             errorMessage = if (lang == "हिंदी") "अत्यधिक गलत प्रयास। डेटा सुरक्षा मोड सक्रिय है।" else if (lang == "తెలుగు") "చాలా సార్లు తప్పుగా టైప్ చేసారు. డేటా ప్రొటెక్షన్ మోడ్ యాక్టివ్ చేయబడింది." else "Too many failed attempts. Data protection mode active."
-            calcResult = "LOCKED (24h)"
         } else if (attempts >= 7) {
             storageHelper.setLockout(30 * 60 * 1000L) // 30 minutes
             lockoutTimeLeft = storageHelper.getLockoutTimeRemaining()
             errorMessage = if (lang == "हिंदी") "अत्यधिक गलत प्रयास। 30 मिनट के लिए अवरुद्ध।" else if (lang == "తెలుగు") "ఎక్కువ సార్లు తప్పుగా టైప్ చేసారు. 30 నిమిషాలు లాక్ చేయబడింది." else "Too many wrong attempts. Locked for 30 minutes."
-            calcResult = "LOCKED (30m)"
         } else if (attempts >= 5) {
             storageHelper.setLockout(5 * 60 * 1000L) // 5 minutes
             lockoutTimeLeft = storageHelper.getLockoutTimeRemaining()
             errorMessage = if (lang == "हिंदी") "अत्यधिक गलत प्रयास। 5 मिनट के लिए अवरुद्ध।" else if (lang == "తెలుగు") "ఎక్కువ సార్లు తప్పుగా టైప్ చేసారు. 5 నిమిషాలు లాక్ చేయబడింది." else "Too many wrong attempts. Locked for 5 minutes."
-            calcResult = "LOCKED (5m)"
         } else if (attempts >= 3) {
             storageHelper.setLockout(30 * 1000L) // 30 seconds
             lockoutTimeLeft = storageHelper.getLockoutTimeRemaining()
             errorMessage = if (lang == "हिंदी") "अत्यधिक गलत प्रयास। 30 सेकंड के लिए अवरुद्ध।" else if (lang == "తెలుగు") "ఎక్కువ सార్లు తప్పుగా టైప్ చేసారు. 30 సెకన్లు లాక్ చేయబడింది." else "Too many wrong attempts. Locked for 30 seconds."
-            calcResult = "LOCKED (30s)"
         } else {
             val remaining = 3 - attempts
             val rem = if (remaining > 0) remaining else 1
             errorMessage = if (lang == "हिंदी") "गलत पिन। ${rem} प्रयास शेष।" else if (lang == "తెలుగు") "తప్పు పిన్. ఇంకా ${rem} సార్లు మాత్రమే అవకాశం ఉంది." else "Incorrect PIN. $rem attempts remaining."
-            calcResult = "Wrong PIN"
             isShaking = true
             scope.launch {
                 delay(300)
@@ -290,6 +208,7 @@ fun PinScreen(
                                 if (savedPin == pin) {
                                     flashSuccess = true
                                     storageHelper.clearLockout()
+                                    com.example.utils.AppLock.clearBackgroundTime(storageHelper)
                                     delay(400)
                                     flashSuccess = false
                                     onUnlocked()
@@ -390,219 +309,17 @@ fun PinScreen(
     val isDisguiseActive = storageHelper.disguiseMode && currentMode == PinMode.Verify
 
     if (isDisguiseActive) {
-        // --- 100% DISGUISED CALCULATOR MODE LAYOUT ---
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(Color(0xFF0F0F0F)) // Neutral black background
-                .padding(20.dp),
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            // Calculator Display Area
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .padding(vertical = 24.dp),
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.Bottom
-            ) {
-                // Expression line
-                Text(
-                    text = calcExpression.ifEmpty { "0" },
-                    fontSize = 32.sp,
-                    color = Color(0xFFA5A5A5),
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.fillMaxWidth().testTag("calc_expression")
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Result line (showing countdown timer if locked)
-                val displayResultText = if (lockoutTimeLeft > 0) {
-                    val totalSecs = (lockoutTimeLeft / 1000L).toInt()
-                    val mins = totalSecs / 60
-                    val secs = totalSecs % 60
-                    String.format("Locked: %02d:%02d", mins, secs)
-                } else {
-                    calcResult
-                }
-
-                Text(
-                    text = displayResultText,
-                    fontSize = 48.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    textAlign = TextAlign.End,
-                    modifier = Modifier.fillMaxWidth().testTag("calc_result")
-                )
+        CalculatorDisguise(
+            savedPin = storageHelper.userPin,
+            onUnlock = {
+                storageHelper.clearLockout()
+                com.example.utils.AppLock.clearBackgroundTime(storageHelper)
+                onUnlocked()
+            },
+            onEmergencyWipe = {
+                showEmergencyConfirm = true
             }
-
-            // Calculator Button Grid
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                // Row 1: C, Backspace, ÷
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    CalculatorButton(
-                        label = "C",
-                        backgroundColor = Color(0xFFA5A5A5),
-                        textColor = Color.Black,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        calcExpression = ""
-                        calcResult = ""
-                    }
-                    CalculatorButton(
-                        label = "⌫",
-                        backgroundColor = Color(0xFFA5A5A5),
-                        textColor = Color.Black,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        if (calcExpression.isNotEmpty()) {
-                            calcExpression = calcExpression.dropLast(1)
-                        }
-                    }
-                    CalculatorButton(
-                        label = "÷",
-                        backgroundColor = Color(0xFFFF9F0A),
-                        textColor = Color.White,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        calcExpression += "÷"
-                    }
-                }
-
-                // Row 2: 7, 8, 9, ×
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    listOf("7", "8", "9").forEach { num ->
-                        CalculatorButton(
-                            label = num,
-                            backgroundColor = Color(0xFF333333),
-                            textColor = Color.White,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            calcExpression += num
-                        }
-                    }
-                    CalculatorButton(
-                        label = "×",
-                        backgroundColor = Color(0xFFFF9F0A),
-                        textColor = Color.White,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        calcExpression += "×"
-                    }
-                }
-
-                // Row 3: 4, 5, 6, -
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    listOf("4", "5", "6").forEach { num ->
-                        CalculatorButton(
-                            label = num,
-                            backgroundColor = Color(0xFF333333),
-                            textColor = Color.White,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            calcExpression += num
-                        }
-                    }
-                    CalculatorButton(
-                        label = "-",
-                        backgroundColor = Color(0xFFFF9F0A),
-                        textColor = Color.White,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        calcExpression += "-"
-                    }
-                }
-
-                // Row 4: 1, 2, 3, +
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    listOf("1", "2", "3").forEach { num ->
-                        CalculatorButton(
-                            label = num,
-                            backgroundColor = Color(0xFF333333),
-                            textColor = Color.White,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            calcExpression += num
-                        }
-                    }
-                    CalculatorButton(
-                        label = "+",
-                        backgroundColor = Color(0xFFFF9F0A),
-                        textColor = Color.White,
-                        modifier = Modifier.weight(1f)
-                    ) {
-                        calcExpression += "+"
-                    }
-                }
-
-                // Row 5: 0, ., =
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    CalculatorButton(
-                        label = "0",
-                        backgroundColor = Color(0xFF333333),
-                        textColor = Color.White,
-                        modifier = Modifier.weight(1.5f)
-                    ) {
-                        calcExpression += "0"
-                    }
-                    CalculatorButton(
-                        label = ".",
-                        backgroundColor = Color(0xFF333333),
-                        textColor = Color.White,
-                        modifier = Modifier.weight(0.75f)
-                    ) {
-                        calcExpression += "."
-                    }
-                    CalculatorButton(
-                        label = "=",
-                        backgroundColor = Color(0xFFFF9F0A),
-                        textColor = Color.White,
-                        modifier = Modifier.weight(0.75f)
-                    ) {
-                        val cleanExpr = calcExpression.trim()
-                        if (cleanExpr == "0000") {
-                            showEmergencyConfirm = true
-                        } else if (storageHelper.userPin != null && cleanExpr == storageHelper.userPin) {
-                            storageHelper.clearLockout()
-                            onUnlocked()
-                        } else {
-                            if (lockoutTimeLeft > 0) {
-                                val secondsRemaining = (lockoutTimeLeft / 1000L)
-                                calcResult = "Locked: ${secondsRemaining}s"
-                            } else {
-                                // If 4 digits only and mismatch -> register wrong attempt
-                                if (cleanExpr.length == 4 && cleanExpr.all { it.isDigit() }) {
-                                    handleWrongAttempt()
-                                } else {
-                                    val ev = evaluateMathExpression(cleanExpr)
-                                    calcResult = ev
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        )
     } else {
         // --- BEAUTIFUL STANDARD VELVETCYCLE PIN DESIGN ---
         val headerText = when (currentMode) {
@@ -771,31 +488,5 @@ fun PinScreen(
                 }
             }
         }
-    }
-}
-
-@Composable
-fun CalculatorButton(
-    label: String,
-    backgroundColor: Color,
-    textColor: Color,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    Box(
-        modifier = modifier
-            .aspectRatio(1.2f)
-            .clip(RoundedCornerShape(16.dp))
-            .background(backgroundColor)
-            .clickable { onClick() }
-            .testTag("calc_btn_$label"),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(
-            text = label,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            color = textColor
-        )
     }
 }

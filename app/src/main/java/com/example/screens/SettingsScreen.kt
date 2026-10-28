@@ -73,6 +73,7 @@ fun SettingsScreen(
     var biometricEnabled by remember { mutableStateOf(storageHelper.biometricEnabled) }
     var activePrivacyFlow by remember { mutableStateOf<String?>(null) } // "setup", "change", or null
     var disguiseEnabled by remember { mutableStateOf(storageHelper.disguiseMode) }
+    var showBiometricUnavailableAlert by remember { mutableStateOf(false) }
 
     // Store & Language states
     var selectedStore by remember { mutableStateOf(storageHelper.padStore) }
@@ -186,6 +187,36 @@ fun SettingsScreen(
                         TextButton(onClick = { showRestoreDialog = false }) {
                             Text(text = "OK", color = colors.pinkAccent, fontWeight = FontWeight.Bold)
                         }
+                    }
+                },
+                containerColor = colors.cardBackground
+            )
+        }
+
+        // --- Biometric Unavailable Alert Dialog ---
+        if (showBiometricUnavailableAlert) {
+            AlertDialog(
+                onDismissRequest = { showBiometricUnavailableAlert = false },
+                title = {
+                    Text(
+                        text = if (lang == "हिंदी") "बायोमेट्रिक प्रमाणीकरण" else "Biometric Authentication",
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary
+                    )
+                },
+                text = {
+                    Text(
+                        text = if (lang == "हिंदी") "इस डिवाइस पर बायोमेट्रिक उपलब्ध नहीं है" else "Biometric not available on this device",
+                        color = colors.textPrimary,
+                        fontSize = 14.sp
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = { showBiometricUnavailableAlert = false },
+                        modifier = Modifier.testTag("biometric_unavailable_ok_button")
+                    ) {
+                        Text(text = "OK", color = colors.pinkAccent, fontWeight = FontWeight.Bold)
                     }
                 },
                 containerColor = colors.cardBackground
@@ -521,48 +552,60 @@ fun SettingsScreen(
 
             val triggerBiometricVerifyAndEnable: (Boolean) -> Unit = { enabled ->
                 if (enabled) {
-                    val activity = context as? FragmentActivity
-                    if (activity != null) {
-                        val executor = ContextCompat.getMainExecutor(context)
-                        val biometricPrompt = BiometricPrompt(
-                            activity,
-                            executor,
-                            object : BiometricPrompt.AuthenticationCallback() {
-                                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
-                                    super.onAuthenticationError(errorCode, errString)
-                                    biometricEnabled = false
-                                    storageHelper.biometricEnabled = false
-                                    Toast.makeText(context, errString, Toast.LENGTH_SHORT).show()
-                                }
-
-                                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
-                                    super.onAuthenticationSucceeded(result)
-                                    biometricEnabled = true
-                                    storageHelper.biometricEnabled = true
-                                    Toast.makeText(context, if (lang == "हिंदी") "बायोमेट्रिक सक्षम!" else "Biometric enabled!", Toast.LENGTH_SHORT).show()
-                                }
-
-                                override fun onAuthenticationFailed() {
-                                    super.onAuthenticationFailed()
-                                }
-                            }
-                        )
-
-                        val promptTitle = if (lang == "हिंदी") "बायोमेट्रिक की पुष्टि करें" else "Confirm Biometric"
-                        val promptSubtitle = if (lang == "हिंदी") "सक्षम करने के लिए प्रमाणित करें" else "Authenticate to enable biometric unlock"
-                        val promptNegative = if (lang == "हिंदी") "रद्द करें" else "Cancel"
-
-                        val promptInfo = BiometricPrompt.PromptInfo.Builder()
-                            .setTitle(promptTitle)
-                            .setSubtitle(promptSubtitle)
-                            .setNegativeButtonText(promptNegative)
-                            .build()
-
-                        biometricPrompt.authenticate(promptInfo)
-                    } else {
+                    val biometricManager = BiometricManager.from(context)
+                    val canAuth = biometricManager.canAuthenticate(
+                        BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.BIOMETRIC_WEAK
+                    )
+                    if (canAuth != BiometricManager.BIOMETRIC_SUCCESS) {
+                        showBiometricUnavailableAlert = true
                         biometricEnabled = false
                         storageHelper.biometricEnabled = false
-                        Toast.makeText(context, "FragmentActivity not available", Toast.LENGTH_SHORT).show()
+                    } else {
+                        val activity = context as? FragmentActivity
+                        if (activity != null) {
+                            val executor = ContextCompat.getMainExecutor(context)
+                            val biometricPrompt = BiometricPrompt(
+                                activity,
+                                executor,
+                                object : BiometricPrompt.AuthenticationCallback() {
+                                    override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                                        super.onAuthenticationError(errorCode, errString)
+                                        biometricEnabled = false
+                                        storageHelper.biometricEnabled = false
+                                        if (errorCode != BiometricPrompt.ERROR_USER_CANCELED && errorCode != BiometricPrompt.ERROR_NEGATIVE_BUTTON) {
+                                            Toast.makeText(context, errString, Toast.LENGTH_SHORT).show()
+                                        }
+                                    }
+
+                                    override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                                        super.onAuthenticationSucceeded(result)
+                                        biometricEnabled = true
+                                        storageHelper.biometricEnabled = true
+                                        Toast.makeText(context, if (lang == "हिंदी") "बायोमेट्रिक सक्षम!" else "Biometric enabled!", Toast.LENGTH_SHORT).show()
+                                    }
+
+                                    override fun onAuthenticationFailed() {
+                                        super.onAuthenticationFailed()
+                                    }
+                                }
+                            )
+
+                            val promptTitle = "Unlock VelvetCycle"
+                            val promptSubtitle = "Authenticate to confirm biometric support"
+                            val promptNegative = "Cancel"
+
+                            val promptInfo = BiometricPrompt.PromptInfo.Builder()
+                                .setTitle(promptTitle)
+                                .setSubtitle(promptSubtitle)
+                                .setNegativeButtonText(promptNegative)
+                                .build()
+
+                            biometricPrompt.authenticate(promptInfo)
+                        } else {
+                            showBiometricUnavailableAlert = true
+                            biometricEnabled = false
+                            storageHelper.biometricEnabled = false
+                        }
                     }
                 } else {
                     biometricEnabled = false
@@ -685,56 +728,54 @@ fun SettingsScreen(
                         HorizontalDivider(color = colors.border, thickness = 0.5.dp)
 
                         // Fingerprint toggle row
-                        if (isBiometricHardwareAvailable) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Fingerprint,
-                                        contentDescription = null,
-                                        tint = colors.pinkAccent,
-                                        modifier = Modifier.size(24.dp)
-                                    )
-                                    Column {
-                                        Text(
-                                            text = if (lang == "हिंदी") "बायोमेट्रिक अनलॉक" else if (lang == "తెలుగు") "బయోమెట్రిక్ అన్‌లాక్" else "Biometric unlock",
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.Bold,
-                                            color = colors.textPrimary,
-                                            modifier = Modifier.testTag("settings_biometric_title")
-                                        )
-                                        Text(
-                                            text = if (lang == "हिंदी") "अनलॉक करने के लिए उंगली या चेहरे का उपयोग करें" else if (lang == "తెలుగు") "అన్‌లాక్ చేయడానికి వేలిముద్ర లేదా ఫేస్ లాక్ ఉపయోగించండి" else "Use fingerprint or face to unlock",
-                                            fontSize = 11.sp,
-                                            color = colors.textSecondary,
-                                            modifier = Modifier.testTag("settings_biometric_subtitle")
-                                        )
-                                    }
-                                }
-                                Switch(
-                                    checked = biometricEnabled,
-                                    onCheckedChange = { checked ->
-                                        triggerBiometricVerifyAndEnable(checked)
-                                    },
-                                    colors = SwitchDefaults.colors(
-                                        checkedThumbColor = Color.White,
-                                        checkedTrackColor = colors.pinkAccent,
-                                        uncheckedThumbColor = colors.textSecondary,
-                                        uncheckedTrackColor = colors.border
-                                    ),
-                                    modifier = Modifier.testTag("settings_biometric_switch")
+                                Icon(
+                                    imageVector = Icons.Default.Fingerprint,
+                                    contentDescription = null,
+                                    tint = colors.pinkAccent,
+                                    modifier = Modifier.size(24.dp)
                                 )
+                                Column {
+                                    Text(
+                                        text = if (lang == "हिंदी") "बायोमेट्रिक अनलॉक" else if (lang == "తెలుగు") "బయోమెట్రిక్ అన్‌లాక్" else "Biometric unlock",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = colors.textPrimary,
+                                        modifier = Modifier.testTag("settings_biometric_title")
+                                    )
+                                    Text(
+                                        text = if (lang == "हिंदी") "अनलॉक करने के लिए उंगली या चेहरे का उपयोग करें" else if (lang == "తెలుగు") "అన్‌లాక్ చేయడానికి వేలిముద్ర లేదా ఫేస్ లాక్ ఉపయోగించండి" else "Use fingerprint or face to unlock",
+                                        fontSize = 11.sp,
+                                        color = colors.textSecondary,
+                                        modifier = Modifier.testTag("settings_biometric_subtitle")
+                                    )
+                                }
                             }
-
-                            HorizontalDivider(color = colors.border, thickness = 0.5.dp)
+                            Switch(
+                                checked = biometricEnabled,
+                                onCheckedChange = { checked ->
+                                    triggerBiometricVerifyAndEnable(checked)
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedThumbColor = Color.White,
+                                    checkedTrackColor = colors.pinkAccent,
+                                    uncheckedThumbColor = colors.textSecondary,
+                                    uncheckedTrackColor = colors.border
+                                ),
+                                modifier = Modifier.testTag("settings_biometric_switch")
+                            )
                         }
+
+                        HorizontalDivider(color = colors.border, thickness = 0.5.dp)
 
                         // Disguise app toggle row
                         Row(
@@ -755,14 +796,14 @@ fun SettingsScreen(
                                 )
                                 Column {
                                     Text(
-                                        text = if (lang == "हिंदी") "ऐप छुपाएं" else if (lang == "తెలుగు") "యాప్‌ను దాచండి" else "Disguise app",
+                                        text = if (lang == "हिंदी") "कैलकुलेटर के रूप में छुपाएं" else if (lang == "తెలుగు") "కాలిక్యులేటర్‌గా దాచండి" else "Disguise app as calculator",
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = colors.textPrimary,
                                         modifier = Modifier.testTag("settings_disguise_title")
                                     )
                                     Text(
-                                        text = if (lang == "हिंदी") "अनलॉक स्क्रीन को एक कैलकुलेटर के रूप में छुपाएं" else if (lang == "తెలుగు") "లాక్ స్క్రీన్‌ను సాధారణ కాలిక్యులేటర్ లాగా చూపించు" else "Hide PIN entry screen behind a working calculator",
+                                        text = if (lang == "हिंदी") "अनलॉक स्क्रीन को एक कैलकुलेटर के रूप में छुपाएं" else if (lang == "తెలుగు") "లాక్ స్క్రీన్‌ను సాధారణ కాలిక్యులేటర్ లాగా చూపించు" else "Show a working calculator instead of PIN screen",
                                         fontSize = 11.sp,
                                         color = colors.textSecondary,
                                         modifier = Modifier.testTag("settings_disguise_subtitle")

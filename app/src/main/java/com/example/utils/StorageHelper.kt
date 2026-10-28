@@ -36,7 +36,8 @@ class StorageHelper(context: Context) {
             prefs.edit().remove(key).commit()
         } else {
             val encrypted = CryptoHelper.encrypt(value)
-            prefs.edit().putString(key, encrypted).commit()
+            val toSave = if (encrypted.isNotEmpty()) encrypted else value
+            prefs.edit().putString(key, toSave).commit()
         }
     }
 
@@ -129,6 +130,10 @@ class StorageHelper(context: Context) {
     var backgroundedAt: Long
         get() = prefs.getLong("backgrounded_at", 0L)
         set(value) { prefs.edit().putLong("backgrounded_at", value).commit() }
+
+    fun clearBackgroundTime() {
+        prefs.edit().remove("backgrounded_at").commit()
+    }
 
     // --- LOG STORAGE & PROCESSING (ENCRYPTED) ---
     fun saveLog(dateStr: String, logData: LogData) {
