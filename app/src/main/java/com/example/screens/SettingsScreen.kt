@@ -1090,7 +1090,7 @@ fun SettingsScreen(
             confirmButton = {
                 TextButton(
                     onClick = {
-                        storageHelper.clear()
+                        com.example.utils.WipeData.wipeAllData(context, storageHelper)
                         showDeleteConfirmDialog = false
                         Toast.makeText(context, "All data deleted! Restarting.", Toast.LENGTH_LONG).show()
                         onNavigateToOnboarding()

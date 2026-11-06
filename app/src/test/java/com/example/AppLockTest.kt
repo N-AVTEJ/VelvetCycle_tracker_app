@@ -188,4 +188,36 @@ class AppLockTest {
         onResumeOrStart()
         assertFalse("Privacy overlay must hide when app returns to active", showPrivacy)
     }
+
+    @Test
+    fun emergencyWipe_clearsAllDataAndResetsToOnboarding() {
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val storageHelper = StorageHelper(context)
+
+        // Seed user and cycle data
+        storageHelper.userPin = "5432"
+        storageHelper.userName = "Maya"
+        storageHelper.isOnboarded = true
+        storageHelper.biometricEnabled = true
+        storageHelper.disguiseMode = true
+        storageHelper.saveLog("2025-08-01", com.example.utils.LogData("Happy", "Medium", listOf("Cramps"), "Test note"))
+
+        assertNotNull(storageHelper.userPin)
+        assertEquals("Maya", storageHelper.userName)
+        assertTrue(storageHelper.isOnboarded)
+        assertNotNull(storageHelper.getLog("2025-08-01"))
+
+        // Perform emergency wipe
+        com.example.utils.WipeData.wipeAllData(context, storageHelper)
+
+        // Verify everything is wiped
+        val freshHelper = StorageHelper(context)
+        assertNull("PIN must be wiped", freshHelper.userPin)
+        assertEquals("User name must be wiped", "", freshHelper.userName)
+        assertFalse("Onboarded status must be reset", freshHelper.isOnboarded)
+        assertFalse("Biometric must be disabled", freshHelper.biometricEnabled)
+        assertFalse("Disguise mode must be disabled", freshHelper.disguiseMode)
+        assertNull("Cycle log must be wiped", freshHelper.getLog("2025-08-01"))
+        assertEquals("All logs must be empty", 0, freshHelper.getAllLogs().size)
+    }
 }

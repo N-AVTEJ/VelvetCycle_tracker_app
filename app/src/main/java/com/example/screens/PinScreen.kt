@@ -269,10 +269,14 @@ fun PinScreen(
     // Emergency Wipe confirmation Dialog
     if (showEmergencyConfirm) {
         AlertDialog(
-            onDismissRequest = { showEmergencyConfirm = false },
+            onDismissRequest = {
+                showEmergencyConfirm = false
+                enteredDigits = ""
+                errorMessage = ""
+            },
             title = {
                 Text(
-                    text = if (lang == "हिंदी") "आपातकालीन डेटा मिटाएं" else if (lang == "తెలుగు") "అత్యవసర డేటా తుడిచివేయి" else "Emergency Data Wipe",
+                    text = if (lang == "हिंदी") "आपातकालीन डेटा मिटाएं" else if (lang == "తెలుగు") "అత్యవసర డేటా తుడిచివేయి" else "Emergency Wipe",
                     fontWeight = FontWeight.Bold,
                     color = colors.textPrimary
                 )
@@ -300,7 +304,14 @@ fun PinScreen(
                 }
             },
             dismissButton = {
-                TextButton(onClick = { showEmergencyConfirm = false }) {
+                TextButton(
+                    modifier = Modifier.testTag("wipe_cancel_btn"),
+                    onClick = {
+                        showEmergencyConfirm = false
+                        enteredDigits = ""
+                        errorMessage = ""
+                    }
+                ) {
                     Text(
                         text = if (lang == "हिंदी") "रद्द करें" else if (lang == "తెలుగు") "రద్దు చేయి" else "Cancel",
                         color = colors.textSecondary

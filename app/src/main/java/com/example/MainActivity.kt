@@ -150,8 +150,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
                                     resetInactivityTimer()
                                 },
                                 onEmergencyWipe = {
-                                    storageHelper.clear()
-                                    com.example.utils.NotificationHelper.cancelAllNotifications(this@MainActivity)
+                                    com.example.utils.WipeData.wipeAllData(this@MainActivity, storageHelper)
                                     isUnlockedState = storageHelper.userPin == null
                                 }
                             )
