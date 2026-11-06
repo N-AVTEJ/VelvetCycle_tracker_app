@@ -19,8 +19,19 @@ data class CycleRecord(
     val notes: String = ""
 )
 
-class StorageHelper(context: Context) {
-    private val prefs: SharedPreferences = context.getSharedPreferences("VelvetCyclePrefs", Context.MODE_PRIVATE)
+/**
+ * Main persistent storage manager for VelvetCycle.
+ *
+ * Architecture:
+ * - Sensitive data (PIN, user profile, cycle history, biometrics, disguise mode, individual logs)
+ *   is encrypted using SecureStore (AES-256-GCM hardware-backed keystore).
+ * - Non-sensitive data (theme, language, pad inventory, notification permissions)
+ *   is stored in regular SharedPreferences (AsyncStorage equivalent).
+ * - Transparent migration guarantees existing unencrypted preferences transition automatically.
+ */
+class StorageHelper(private val context: Context) {
+    // Non-sensitive regular preferences (AsyncStorage)
+    private val regularPrefs: SharedPreferences = context.getSharedPreferences("VelvetCyclePrefs", Context.MODE_PRIVATE)
 
     companion object {
         private const val KEY_IS_ONBOARDED = "is_onboarded"
@@ -28,85 +39,178 @@ class StorageHelper(context: Context) {
         private const val KEY_LAST_PERIOD_START = "last_period_start"
         private const val KEY_PERIOD_DURATION = "period_duration"
         private const val KEY_CYCLE_LENGTH = "cycle_length"
+        private const val KEY_USER_PIN = "user_pin"
+        private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
+        private const val KEY_DISGUISE_MODE = "disguise_mode"
     }
 
-    // --- SECURE STORAGE HELPERS ---
-    private fun saveSecureString(key: String, value: String?) {
-        if (value == null) {
-            prefs.edit().remove(key).commit()
-        } else {
-            val encrypted = CryptoHelper.encrypt(value)
-            val toSave = if (encrypted.isNotEmpty()) encrypted else value
-            prefs.edit().putString(key, toSave).commit()
-        }
+    init {
+        migrateSensitiveDataIfNeeded()
     }
 
-    private fun getSecureString(key: String, defaultValue: String = ""): String {
-        val encrypted = prefs.getString(key, null) ?: return defaultValue
-        if (encrypted.contains(":")) {
-            val decrypted = CryptoHelper.decrypt(encrypted)
-            return decrypted.ifEmpty { defaultValue }
-        }
-        return encrypted.ifEmpty { defaultValue }
+    // --- SECURE STORE CORE API (Corresponds to expo-secure-store) ---
+
+    fun saveSecure(key: String, value: Any?): Boolean {
+        return SecureStore.saveSecure(context, key, value)
     }
 
-    private fun saveSecureInt(key: String, value: Int) {
-        saveSecureString(key, value.toString())
+    fun getSecure(key: String): String? {
+        return SecureStore.getSecure(context, key)
     }
 
-    private fun getSecureInt(key: String, defaultValue: Int): Int {
-        val encrypted = prefs.getString(key, null)
-        if (encrypted == null) {
-            if (prefs.contains(key)) {
-                try {
-                    return prefs.getInt(key, defaultValue)
-                } catch (e: Exception) {}
+    fun deleteSecure(key: String): Boolean {
+        return SecureStore.deleteSecure(context, key)
+    }
+
+    /**
+     * Auto-migrates any legacy sensitive keys found in regularPrefs to SecureStore.
+     */
+    private fun migrateSensitiveDataIfNeeded() {
+        val sensitiveKeys = listOf(
+            KEY_USER_NAME,
+            KEY_LAST_PERIOD_START,
+            KEY_PERIOD_DURATION,
+            KEY_CYCLE_LENGTH,
+            KEY_USER_PIN,
+            KEY_BIOMETRIC_ENABLED,
+            KEY_DISGUISE_MODE,
+            "lockout_duration",
+            "lockout_expiration_time",
+            "pin_attempts",
+            "razorpay_key_id",
+            "monthly_plan_id",
+            "yearly_plan_id",
+            "is_premium_user",
+            "subscription_plan"
+        )
+
+        val editor = regularPrefs.edit()
+        var changed = false
+
+        for (key in sensitiveKeys) {
+            if (regularPrefs.contains(key) && SecureStore.getSecure(context, key) == null) {
+                val rawVal = regularPrefs.all[key]
+                if (rawVal != null) {
+                    val stringVal = if (rawVal is String && rawVal.contains(":")) {
+                        CryptoHelper.decrypt(rawVal).ifEmpty { rawVal }
+                    } else {
+                        rawVal.toString()
+                    }
+                    SecureStore.saveSecure(context, key, stringVal)
+                    editor.remove(key)
+                    changed = true
+                }
             }
-            return defaultValue
         }
-        val str = getSecureString(key, "")
-        return str.toIntOrNull() ?: defaultValue
-    }
 
-    private fun saveSecureBoolean(key: String, value: Boolean) {
-        saveSecureString(key, value.toString())
-    }
-
-    private fun getSecureBoolean(key: String, defaultValue: Boolean): Boolean {
-        val encrypted = prefs.getString(key, null)
-        if (encrypted == null) {
-            if (prefs.contains(key)) {
-                try {
-                    return prefs.getBoolean(key, defaultValue)
-                } catch (e: Exception) {}
+        // Migrate any existing daily logs (log_YYYY-MM-DD)
+        for ((key, value) in regularPrefs.all) {
+            if (key.startsWith("log_")) {
+                if (SecureStore.getSecure(context, key) == null) {
+                    val rawStr = value as? String ?: value.toString()
+                    val decrypted = if (rawStr.contains(":")) {
+                        CryptoHelper.decrypt(rawStr).ifEmpty { rawStr }
+                    } else {
+                        rawStr
+                    }
+                    SecureStore.saveSecure(context, key, decrypted)
+                }
+                editor.remove(key)
+                changed = true
             }
-            return defaultValue
         }
-        val str = getSecureString(key, "")
-        return str.toBooleanStrictOrNull() ?: defaultValue
+
+        if (changed) {
+            editor.commit()
+        }
     }
 
-    private fun saveSecureLong(key: String, value: Long) {
-        saveSecureString(key, value.toString())
-    }
+    // --- CONVENTIONAL NON-SENSITIVE PROPERTIES (AsyncStorage) ---
 
-    private fun getSecureLong(key: String, defaultValue: Long): Long {
-        val str = getSecureString(key, "")
-        return str.toLongOrNull() ?: defaultValue
-    }
-
-    // --- CONVENTIONAL & SECURED PROPERTIES ---
     var isOnboarded: Boolean
-        get() = prefs.getBoolean(KEY_IS_ONBOARDED, false)
-        set(value) { prefs.edit().putBoolean(KEY_IS_ONBOARDED, value).commit() }
+        get() = regularPrefs.getBoolean(KEY_IS_ONBOARDED, false)
+        set(value) { regularPrefs.edit().putBoolean(KEY_IS_ONBOARDED, value).commit() }
+
+    var isDarkMode: Boolean
+        get() = regularPrefs.getBoolean("dark_mode", false)
+        set(value) { regularPrefs.edit().putBoolean("dark_mode", value).commit() }
+
+    var appLanguage: String
+        get() = regularPrefs.getString("app_language", "English") ?: "English"
+        set(value) { regularPrefs.edit().putString("app_language", value).commit() }
+
+    var padStore: String
+        get() = regularPrefs.getString("pad_store", "") ?: ""
+        set(value) { regularPrefs.edit().putString("pad_store", value).commit() }
+
+    var permissionsAsked: Boolean
+        get() = regularPrefs.getBoolean("permissions_asked", false)
+        set(value) { regularPrefs.edit().putBoolean("permissions_asked", value).commit() }
+
+    var notificationTestSent: Boolean
+        get() = regularPrefs.getBoolean("notification_test_sent", false)
+        set(value) { regularPrefs.edit().putBoolean("notification_test_sent", value).commit() }
+
+    var backgroundedAt: Long
+        get() = regularPrefs.getLong("backgrounded_at", 0L)
+        set(value) { regularPrefs.edit().putLong("backgrounded_at", value).commit() }
+
+    fun clearBackgroundTime() {
+        regularPrefs.edit().remove("backgrounded_at").commit()
+    }
+
+    // --- NON-SENSITIVE NOTIFICATION SETTINGS ---
+
+    var periodReminderEnabled: Boolean
+        get() = regularPrefs.getBoolean("notif_period_reminder", true)
+        set(value) { regularPrefs.edit().putBoolean("notif_period_reminder", value).commit() }
+
+    var periodReminderDaysBefore: Int
+        get() = regularPrefs.getInt("notif_period_days_before", 1)
+        set(value) { regularPrefs.edit().putInt("notif_period_days_before", value).commit() }
+
+    var periodReminderTime: String
+        get() = regularPrefs.getString("notif_period_time", "08:00") ?: "08:00"
+        set(value) { regularPrefs.edit().putString("notif_period_time", value).commit() }
+
+    var ovulationAlertEnabled: Boolean
+        get() = regularPrefs.getBoolean("notif_ovulation_alert", true)
+        set(value) { regularPrefs.edit().putBoolean("notif_ovulation_alert", value).commit() }
+
+    var dailyLogReminderEnabled: Boolean
+        get() = regularPrefs.getBoolean("notif_daily_log", true)
+        set(value) { regularPrefs.edit().putBoolean("notif_daily_log", value).commit() }
+
+    var dailyLogReminderTime: String
+        get() = regularPrefs.getString("notif_daily_log_time", "21:00") ?: "21:00"
+        set(value) { regularPrefs.edit().putString("notif_daily_log_time", value).commit() }
+
+    var padReminderEnabled: Boolean
+        get() = regularPrefs.getBoolean("notif_pad_reminder", true)
+        set(value) { regularPrefs.edit().putBoolean("notif_pad_reminder", value).commit() }
+
+    // --- SENSITIVE DATA STORED IN SECURESTORE ---
+
+    var userPin: String?
+        get() {
+            val pin = getSecure(KEY_USER_PIN)
+            return if (pin.isNullOrEmpty()) null else pin
+        }
+        set(value) {
+            if (value == null) {
+                deleteSecure(KEY_USER_PIN)
+            } else {
+                saveSecure(KEY_USER_PIN, value)
+            }
+        }
 
     var userName: String
-        get() = getSecureString(KEY_USER_NAME, "")
-        set(value) = saveSecureString(KEY_USER_NAME, value)
+        get() = getSecure(KEY_USER_NAME) ?: ""
+        set(value) { saveSecure(KEY_USER_NAME, value) }
 
     var lastPeriodStart: LocalDate
         get() {
-            val dateStr = getSecureString(KEY_LAST_PERIOD_START, "")
+            val dateStr = getSecure(KEY_LAST_PERIOD_START) ?: ""
             return if (dateStr.isNotEmpty()) {
                 try {
                     LocalDate.parse(dateStr)
@@ -117,25 +221,30 @@ class StorageHelper(context: Context) {
                 LocalDate.now()
             }
         }
-        set(value) = saveSecureString(KEY_LAST_PERIOD_START, value.toString())
+        set(value) { saveSecure(KEY_LAST_PERIOD_START, value.toString()) }
 
     var periodDuration: Int
-        get() = getSecureInt(KEY_PERIOD_DURATION, 5)
-        set(value) = saveSecureInt(KEY_PERIOD_DURATION, value)
+        get() = getSecure(KEY_PERIOD_DURATION)?.toIntOrNull() ?: 5
+        set(value) { saveSecure(KEY_PERIOD_DURATION, value) }
 
     var cycleLength: Int
-        get() = getSecureInt(KEY_CYCLE_LENGTH, 28)
-        set(value) = saveSecureInt(KEY_CYCLE_LENGTH, value)
+        get() = getSecure(KEY_CYCLE_LENGTH)?.toIntOrNull() ?: 28
+        set(value) { saveSecure(KEY_CYCLE_LENGTH, value) }
 
-    var backgroundedAt: Long
-        get() = prefs.getLong("backgrounded_at", 0L)
-        set(value) { prefs.edit().putLong("backgrounded_at", value).commit() }
+    var biometricEnabled: Boolean
+        get() = getSecure(KEY_BIOMETRIC_ENABLED)?.toBooleanStrictOrNull() ?: false
+        set(value) { saveSecure(KEY_BIOMETRIC_ENABLED, value) }
 
-    fun clearBackgroundTime() {
-        prefs.edit().remove("backgrounded_at").commit()
-    }
+    var disguiseMode: Boolean
+        get() = getSecure(KEY_DISGUISE_MODE)?.toBooleanStrictOrNull() ?: false
+        set(value) { saveSecure(KEY_DISGUISE_MODE, value) }
 
-    // --- LOG STORAGE & PROCESSING (ENCRYPTED) ---
+    // --- INDIVIDUAL DAILY LOG ENTRIES IN SECURESTORE (log_YYYY-MM-DD) ---
+
+    /**
+     * Stores each daily log as an individual encrypted key in SecureStore: log_YYYY-MM-DD
+     * Adheres to SecureStore's 2KB maximum per-key size limit.
+     */
     fun saveLog(dateStr: String, logData: LogData) {
         val jsonObject = org.json.JSONObject()
         jsonObject.put("mood", logData.mood)
@@ -144,12 +253,15 @@ class StorageHelper(context: Context) {
         logData.symptoms.forEach { symptomsArray.put(it) }
         jsonObject.put("symptoms", symptomsArray)
         jsonObject.put("notes", logData.notes)
-        
-        saveSecureString("log_$dateStr", jsonObject.toString())
+
+        saveSecure("log_$dateStr", jsonObject.toString())
     }
 
+    /**
+     * Retrieves an individual daily log from SecureStore by date.
+     */
     fun getLog(dateStr: String): LogData? {
-        val jsonStr = getSecureString("log_$dateStr", "")
+        val jsonStr = getSecure("log_$dateStr") ?: return null
         if (jsonStr.isEmpty()) return null
         return try {
             val jsonObject = org.json.JSONObject(jsonStr)
@@ -169,16 +281,19 @@ class StorageHelper(context: Context) {
         }
     }
 
-    fun clear() {
-        prefs.edit().clear().commit()
+    fun deleteLog(dateStr: String): Boolean {
+        return deleteSecure("log_$dateStr")
     }
 
+    /**
+     * Returns all individual daily logs stored in SecureStore.
+     */
     fun getAllLogs(): Map<String, LogData> {
         val result = mutableMapOf<String, LogData>()
-        val allPrefs = prefs.all
-        for ((key, value) in allPrefs) {
-            if (key.startsWith("log_") && value is String) {
-                val dateStr = key.substring(4)
+        val allSecureKeys = SecureStore.getAllKeys(context)
+        for (key in allSecureKeys) {
+            if (key.startsWith("log_")) {
+                val dateStr = key.removePrefix("log_")
                 val logData = getLog(dateStr)
                 if (logData != null) {
                     result[dateStr] = logData
@@ -231,116 +346,56 @@ class StorageHelper(context: Context) {
         return records.sortedByDescending { it.startDate }
     }
 
-    // --- SECURE SECURITY PROPERTIES ---
-    var userPin: String?
-        get() {
-            val pin = getSecureString("user_pin", "")
-            return pin.ifEmpty { null }
-        }
-        set(value) = saveSecureString("user_pin", value)
+    // --- SENSITIVE LOCKOUT & PIN ATTEMPTS (DELEGATED TO PINAUTH) ---
 
-    var biometricEnabled: Boolean
-        get() = getSecureBoolean("biometric_enabled", false)
-        set(value) = saveSecureBoolean("biometric_enabled", value)
-
-    var disguiseMode: Boolean
-        get() = getSecureBoolean("disguise_mode", false)
-        set(value) = saveSecureBoolean("disguise_mode", value)
-
-    var padStore: String
-        get() = prefs.getString("pad_store", "") ?: ""
-        set(value) { prefs.edit().putString("pad_store", value).commit() }
-
-    var appLanguage: String
-        get() = prefs.getString("app_language", "English") ?: "English"
-        set(value) { prefs.edit().putString("app_language", value).commit() }
-
-    var permissionsAsked: Boolean
-        get() = prefs.getBoolean("permissions_asked", false)
-        set(value) { prefs.edit().putBoolean("permissions_asked", value).commit() }
-
-    var notificationTestSent: Boolean
-        get() = prefs.getBoolean("notification_test_sent", false)
-        set(value) { prefs.edit().putBoolean("notification_test_sent", value).commit() }
-
-    var isDarkMode: Boolean
-        get() = prefs.getBoolean("dark_mode", false)
-        set(value) { prefs.edit().putBoolean("dark_mode", value).commit() }
-
-    // --- SECURE NOTIFICATION PREFERENCES ---
-    var periodReminderEnabled: Boolean
-        get() = getSecureBoolean("notif_period_reminder", true)
-        set(value) = saveSecureBoolean("notif_period_reminder", value)
-
-    var periodReminderDaysBefore: Int
-        get() = getSecureInt("notif_period_days_before", 1)
-        set(value) = saveSecureInt("notif_period_days_before", value)
-
-    var periodReminderTime: String
-        get() = getSecureString("notif_period_time", "08:00")
-        set(value) = saveSecureString("notif_period_time", value)
-
-    var ovulationAlertEnabled: Boolean
-        get() = getSecureBoolean("notif_ovulation_alert", true)
-        set(value) = saveSecureBoolean("notif_ovulation_alert", value)
-
-    var dailyLogReminderEnabled: Boolean
-        get() = getSecureBoolean("notif_daily_log", true)
-        set(value) = saveSecureBoolean("notif_daily_log", value)
-
-    var dailyLogReminderTime: String
-        get() = getSecureString("notif_daily_log_time", "21:00")
-        set(value) = saveSecureString("notif_daily_log_time", value)
-
-    var padReminderEnabled: Boolean
-        get() = getSecureBoolean("notif_pad_reminder", true)
-        set(value) = saveSecureBoolean("notif_pad_reminder", value)
-
-    // --- ADVANCED LOCKOUT & TIMEOUT MANAGEMENT ---
     var lockoutDuration: Long
-        get() = getSecureLong("lockout_duration", 0L)
-        set(value) = saveSecureLong("lockout_duration", value)
+        get() = PinAuth.getLockoutTotalDuration(context)
+        set(value) { saveSecure("lockout_duration", value) }
 
     fun getLockoutTimeRemaining(): Long {
-        val expiration = getSecureLong("lockout_expiration_time", 0L)
-        if (expiration == 0L) return 0L
-        val diff = expiration - System.currentTimeMillis()
-        return if (diff > 0) diff else 0L
+        return PinAuth.getRemainingMs(context)
     }
 
     fun setLockout(durationMs: Long) {
-        lockoutDuration = durationMs
-        saveSecureLong("lockout_expiration_time", System.currentTimeMillis() + durationMs)
+        saveSecure("lockout_duration", durationMs)
+        saveSecure(PinAuth.KEY_PIN_LOCKOUT_UNTIL, System.currentTimeMillis() + durationMs)
+        saveSecure("lockout_expiration_time", System.currentTimeMillis() + durationMs)
     }
 
     fun clearLockout() {
-        saveSecureLong("lockout_expiration_time", 0L)
-        lockoutDuration = 0L
-        saveSecureInt("pin_attempts", 0)
+        PinAuth.resetAttempts(context)
     }
 
     var wrongAttempts: Int
-        get() = getSecureInt("pin_attempts", 0)
-        set(value) = saveSecureInt("pin_attempts", value)
+        get() = PinAuth.getAttempts(context)
+        set(value) { saveSecure(PinAuth.KEY_PIN_ATTEMPTS, value) }
 
-    // --- SUBSCRIPTION & RAZORPAY PREFERENCES ---
+    // --- SENSITIVE SUBSCRIPTION & RAZORPAY PREFERENCES ---
+
     var razorpayKeyId: String
-        get() = getSecureString("razorpay_key_id", "")
-        set(value) = saveSecureString("razorpay_key_id", value)
+        get() = getSecure("razorpay_key_id") ?: ""
+        set(value) { saveSecure("razorpay_key_id", value) }
 
     var monthlyPlanId: String
-        get() = getSecureString("monthly_plan_id", "")
-        set(value) = saveSecureString("monthly_plan_id", value)
+        get() = getSecure("monthly_plan_id") ?: ""
+        set(value) { saveSecure("monthly_plan_id", value) }
 
     var yearlyPlanId: String
-        get() = getSecureString("yearly_plan_id", "")
-        set(value) = saveSecureString("yearly_plan_id", value)
+        get() = getSecure("yearly_plan_id") ?: ""
+        set(value) { saveSecure("yearly_plan_id", value) }
 
     var isPremiumUser: Boolean
-        get() = getSecureBoolean("is_premium_user", false)
-        set(value) = saveSecureBoolean("is_premium_user", value)
+        get() = getSecure("is_premium_user")?.toBooleanStrictOrNull() ?: false
+        set(value) { saveSecure("is_premium_user", value) }
 
     var subscriptionPlan: String
-        get() = getSecureString("subscription_plan", "none")
-        set(value) = saveSecureString("subscription_plan", value)
+        get() = getSecure("subscription_plan") ?: "none"
+        set(value) { saveSecure("subscription_plan", value) }
+
+    // --- CLEAR EVERYTHING ---
+
+    fun clear() {
+        regularPrefs.edit().clear().commit()
+        SecureStore.clear(context)
+    }
 }

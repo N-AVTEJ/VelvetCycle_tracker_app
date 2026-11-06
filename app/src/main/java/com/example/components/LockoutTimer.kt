@@ -93,17 +93,25 @@ fun LockoutTimer(
         )
 
         if (isDataProtectionWarning) {
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(
-                text = warningText,
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Medium,
-                color = Color.Red,
-                textAlign = TextAlign.Center,
+            val fullWarning = if (lang == "हिंदी") "अत्यधिक विफल प्रयास। डेटा सुरक्षा मोड सक्रिय है।" else if (lang == "తెలుగు") "చాలా సార్లు విఫల ప్రయత్నాలు. డేటా రక్షణ మోడ్ యాక్టివ్ చేయబడింది." else "Too many failed attempts. Data protection mode active."
+            Spacer(modifier = Modifier.height(18.dp))
+            Box(
                 modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .testTag("lockout_warning")
-            )
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFFB71C1C).copy(alpha = 0.25f))
+                    .padding(12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = fullWarning,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFFF5252),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.testTag("lockout_warning")
+                )
+            }
         }
     }
 }

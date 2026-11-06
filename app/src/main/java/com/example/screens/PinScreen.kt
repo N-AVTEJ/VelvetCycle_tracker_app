@@ -78,8 +78,9 @@ fun PinScreen(
     var errorMessage by remember { mutableStateOf("") }
     var isShaking by remember { mutableStateOf(false) }
     var flashSuccess by remember { mutableStateOf(false) }
-    var lockoutTimeLeft by remember { mutableStateOf(storageHelper.getLockoutTimeRemaining()) }
-    val lockoutDuration = storageHelper.lockoutDuration
+    var lockoutStatus by remember { mutableStateOf(com.example.utils.PinAuth.getLockoutStatus(context)) }
+    var lockoutTimeLeft by remember { mutableStateOf(lockoutStatus.remainingMs) }
+    var lockoutTotalDuration by remember { mutableStateOf(com.example.utils.PinAuth.getLockoutTotalDuration(context)) }
     var showEmergencyConfirm by remember { mutableStateOf(false) }
 
     // Lockout countdown loop
@@ -87,9 +88,12 @@ fun PinScreen(
         if (lockoutTimeLeft > 0) {
             while (lockoutTimeLeft > 0) {
                 delay(1000L)
-                lockoutTimeLeft = storageHelper.getLockoutTimeRemaining()
+                lockoutStatus = com.example.utils.PinAuth.getLockoutStatus(context)
+                lockoutTimeLeft = lockoutStatus.remainingMs
+                lockoutTotalDuration = com.example.utils.PinAuth.getLockoutTotalDuration(context)
             }
-            storageHelper.clearLockout()
+            com.example.utils.PinAuth.resetAttempts(context)
+            lockoutStatus = com.example.utils.PinAuth.getLockoutStatus(context)
             errorMessage = ""
         }
     }
@@ -109,7 +113,7 @@ fun PinScreen(
 
                     override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
                         super.onAuthenticationSucceeded(result)
-                        storageHelper.clearLockout()
+                        com.example.utils.PinAuth.resetAttempts(context)
                         com.example.utils.AppLock.clearBackgroundTime(storageHelper)
                         onUnlocked()
                     }
@@ -151,27 +155,24 @@ fun PinScreen(
         canAuth == BiometricManager.BIOMETRIC_SUCCESS
     }
 
-    // Handles Wrong Attempts with Tiers
+    // Handles Wrong Attempts with Tiers via PinAuth
     val handleWrongAttempt = {
-        val attempts = storageHelper.wrongAttempts + 1
-        storageHelper.wrongAttempts = attempts
+        val updatedStatus = com.example.utils.PinAuth.recordWrongAttempt(context)
+        lockoutStatus = updatedStatus
+        lockoutTimeLeft = updatedStatus.remainingMs
+        lockoutTotalDuration = com.example.utils.PinAuth.getLockoutTotalDuration(context)
 
-        if (attempts >= 10) {
-            storageHelper.setLockout(24 * 60 * 60 * 1000L) // 24 hours
-            lockoutTimeLeft = storageHelper.getLockoutTimeRemaining()
-            errorMessage = if (lang == "हिंदी") "अत्यधिक गलत प्रयास। डेटा सुरक्षा मोड सक्रिय है।" else if (lang == "తెలుగు") "చాలా సార్లు తప్పుగా టైప్ చేసారు. డేటా ప్రొటెక్షన్ మోడ్ యాక్టివ్ చేయబడింది." else "Too many failed attempts. Data protection mode active."
-        } else if (attempts >= 7) {
-            storageHelper.setLockout(30 * 60 * 1000L) // 30 minutes
-            lockoutTimeLeft = storageHelper.getLockoutTimeRemaining()
-            errorMessage = if (lang == "हिंदी") "अत्यधिक गलत प्रयास। 30 मिनट के लिए अवरुद्ध।" else if (lang == "తెలుగు") "ఎక్కువ సార్లు తప్పుగా టైప్ చేసారు. 30 నిమిషాలు లాక్ చేయబడింది." else "Too many wrong attempts. Locked for 30 minutes."
-        } else if (attempts >= 5) {
-            storageHelper.setLockout(5 * 60 * 1000L) // 5 minutes
-            lockoutTimeLeft = storageHelper.getLockoutTimeRemaining()
-            errorMessage = if (lang == "हिंदी") "अत्यधिक गलत प्रयास। 5 मिनट के लिए अवरुद्ध।" else if (lang == "తెలుగు") "ఎక్కువ సార్లు తప్పుగా టైప్ చేసారు. 5 నిమిషాలు లాక్ చేయబడింది." else "Too many wrong attempts. Locked for 5 minutes."
-        } else if (attempts >= 3) {
-            storageHelper.setLockout(30 * 1000L) // 30 seconds
-            lockoutTimeLeft = storageHelper.getLockoutTimeRemaining()
-            errorMessage = if (lang == "हिंदी") "अत्यधिक गलत प्रयास। 30 सेकंड के लिए अवरुद्ध।" else if (lang == "తెలుగు") "ఎక్కువ सార్లు తప్పుగా టైప్ చేసారు. 30 సెకన్లు లాక్ చేయబడింది." else "Too many wrong attempts. Locked for 30 seconds."
+        val attempts = updatedStatus.attempts
+        if (updatedStatus.isLocked) {
+            if (attempts >= 10) {
+                errorMessage = if (lang == "हिंदी") "अत्यधिक विफल प्रयास। डेटा सुरक्षा मोड सक्रिय है।" else if (lang == "తెలుగు") "చాలా సార్లు విఫల ప్రయత్నాలు. డేటా రక్షణ మోడ్ యాక్టివ్ చేయబడింది." else "Too many failed attempts. Data protection mode active."
+            } else if (attempts >= 7) {
+                errorMessage = if (lang == "हिंदी") "अत्यधिक गलत प्रयास। 30 मिनट के लिए अवरुद्ध।" else if (lang == "తెలుగు") "ఎక్కువ సార్లు తప్పుగా టైప్ చేసారు. 30 నిమిషాలు లాక్ చేయబడింది." else "Too many wrong attempts. Locked for 30 minutes."
+            } else if (attempts >= 5) {
+                errorMessage = if (lang == "हिंदी") "अत्यधिक गलत प्रयास। 5 मिनट के लिए अवरुद्ध।" else if (lang == "తెలుగు") "ఎక్కువ సార్లు తప్పుగా టైప్ చేసారు. 5 నిమిషాలు లాక్ చేయబడింది." else "Too many wrong attempts. Locked for 5 minutes."
+            } else {
+                errorMessage = if (lang == "हिंदी") "अत्यधिक गलत प्रयास। 30 सेकंड के लिए अवरुद्ध।" else if (lang == "తెలుగు") "ఎక్కువ సార్లు తప్పుగా టైప్ చేసారు. 30 సెకన్లు లాక్ చేయబడింది." else "Too many wrong attempts. Locked for 30 seconds."
+            }
         } else {
             val remaining = 3 - attempts
             val rem = if (remaining > 0) remaining else 1
@@ -207,7 +208,9 @@ fun PinScreen(
                                 val savedPin = storageHelper.userPin
                                 if (savedPin == pin) {
                                     flashSuccess = true
-                                    storageHelper.clearLockout()
+                                    com.example.utils.PinAuth.resetAttempts(context)
+                                    lockoutStatus = com.example.utils.PinAuth.getLockoutStatus(context)
+                                    lockoutTimeLeft = 0L
                                     com.example.utils.AppLock.clearBackgroundTime(storageHelper)
                                     delay(400)
                                     flashSuccess = false
@@ -224,6 +227,7 @@ fun PinScreen(
                                 if (mode.firstPin == pin) {
                                     flashSuccess = true
                                     storageHelper.userPin = pin
+                                    com.example.utils.PinAuth.resetAttempts(context)
                                     delay(400)
                                     flashSuccess = false
                                     onSetupComplete()
@@ -239,6 +243,7 @@ fun PinScreen(
                                 val savedPin = storageHelper.userPin
                                 if (savedPin == null || savedPin == pin) {
                                     flashSuccess = true
+                                    com.example.utils.PinAuth.resetAttempts(context)
                                     delay(400)
                                     flashSuccess = false
                                     currentMode = PinMode.Setup
@@ -331,9 +336,16 @@ fun PinScreen(
 
         val subTitleLabel = if (lang == "हिंदी") "आपका सुरक्षित चक्र साथी" else if (lang == "తెలుగు") "మీ సురక్షిత సైకిల్ గైడ్" else "YOUR INTIMATE HEALTH PARTNER"
 
+        val isTier10Active = (lockoutTimeLeft > 0 && lockoutStatus.attempts >= 10)
+        val screenBgColor = if (isTier10Active) {
+            Color(0xFF2B0A0D) // Deep warning red background
+        } else {
+            colors.background
+        }
+
         Scaffold(
             modifier = Modifier.fillMaxSize(),
-            containerColor = colors.background
+            containerColor = screenBgColor
         ) { paddingValues ->
             Column(
                 modifier = Modifier
@@ -356,33 +368,32 @@ fun PinScreen(
                             text = "VelvetCycle",
                             fontSize = 32.sp,
                             fontWeight = FontWeight.Bold,
-                            color = colors.pinkAccent,
+                            color = if (isTier10Active) Color(0xFFFF5252) else colors.pinkAccent,
                             letterSpacing = 1.sp
                         )
                         Icon(
                             imageVector = Icons.Default.Lock,
                             contentDescription = "Locked",
-                            tint = colors.pinkAccent,
+                            tint = if (isTier10Active) Color(0xFFFF5252) else colors.pinkAccent,
                             modifier = Modifier.size(24.dp)
                         )
                     }
 
                     Text(
-                        text = subTitleLabel,
+                        text = if (isTier10Active) "DATA PROTECTION ACTIVE" else subTitleLabel,
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        color = colors.textSecondary,
+                        color = if (isTier10Active) Color(0xFFFF8A80) else colors.textSecondary,
                         letterSpacing = 2.sp,
                         modifier = Modifier.padding(top = 4.dp, bottom = 24.dp)
                     )
 
                     // Lockout mode vs Normal PIN entry
                     if (lockoutTimeLeft > 0) {
-                        val isTier10 = storageHelper.wrongAttempts >= 10
                         LockoutTimer(
                             timeLeftMs = lockoutTimeLeft,
-                            totalDurationMs = lockoutDuration,
-                            isDataProtectionWarning = isTier10,
+                            totalDurationMs = lockoutTotalDuration,
+                            isDataProtectionWarning = isTier10Active,
                             modifier = Modifier.padding(vertical = 16.dp)
                         )
                     } else {
