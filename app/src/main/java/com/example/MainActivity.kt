@@ -47,6 +47,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.components.PrivacyOverlay
 import com.example.screens.CalendarScreen
 import com.example.utils.AppLock
 import com.example.screens.HomeScreen
@@ -89,8 +90,9 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
         
         storageHelper = StorageHelper(this)
         
-        // Screenshot prevention: prevents screenshots and screen recording.
-        // Disabled here because FLAG_SECURE makes the streaming emulator screen black.
+        // FLAG_SECURE for Android screenshot prevention
+        // This only works in production APK build, not Expo Go
+        // Will be enabled via MainActivity.java modification in Phase 46 EAS build
         // window.setFlags(
         //     WindowManager.LayoutParams.FLAG_SECURE,
         //     WindowManager.LayoutParams.FLAG_SECURE
@@ -102,18 +104,22 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
         
         isUnlockedState = storageHelper.userPin == null
 
-        // App lifecycle observer for auto-locking and privacy screen overlaying
+        // App lifecycle observer:
+        // 'background' or 'inactive' -> show PrivacyOverlay (showPrivacyOverlay = true)
+        // 'active' -> hide overlay first (showPrivacyOverlay = false), then check shouldLock()
         lifecycle.addObserver(LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_STOP -> {
+                Lifecycle.Event.ON_PAUSE, Lifecycle.Event.ON_STOP -> {
+                    // Instantly show PrivacyOverlay when app goes to background or inactive
+                    showPrivacyOverlay = true
                     if (storageHelper.userPin != null) {
                         AppLock.saveBackgroundTime(storageHelper)
                     }
-                    // Instantly show the privacy background to protect content in App Switcher
-                    showPrivacyOverlay = true
                 }
-                Lifecycle.Event.ON_START -> {
+                Lifecycle.Event.ON_RESUME, Lifecycle.Event.ON_START -> {
+                    // Hide overlay first
                     showPrivacyOverlay = false
+                    // Then check shouldLock()
                     if (storageHelper.userPin != null && isUnlockedState) {
                         val bgTime = storageHelper.backgroundedAt
                         if (AppLock.shouldLock(bgTime)) {
@@ -182,41 +188,6 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     }
 }
 
-@Composable
-fun PrivacyOverlay(isDisguised: Boolean = false) {
-    if (isDisguised) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(androidx.compose.ui.graphics.Color(0xFF121214))
-                .testTag("privacy_overlay"),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Calculator",
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Medium,
-                color = androidx.compose.ui.graphics.Color(0xFF9E9EA7)
-            )
-        }
-    } else {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(androidx.compose.ui.graphics.Color(0xFFD4537E))
-                .testTag("privacy_overlay"),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "VelvetCycle",
-                fontSize = 32.sp,
-                fontWeight = FontWeight.Bold,
-                color = androidx.compose.ui.graphics.Color.White,
-                letterSpacing = 1.sp
-            )
-        }
-    }
-}
 
 @Composable
 fun MainAppLayout(

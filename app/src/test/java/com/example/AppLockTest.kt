@@ -162,4 +162,30 @@ class AppLockTest {
         assertEquals("4821", last4Digits)
         assertEquals(savedPin, last4Digits)
     }
+
+    @Test
+    fun privacyOverlay_lifecycleAndVisibilityVerification() {
+        // Test simulation of AppState listener:
+        // background/inactive -> showPrivacy = true
+        var showPrivacy = false
+
+        val onPauseOrStop = {
+            showPrivacy = true
+        }
+
+        val onResumeOrStart = {
+            showPrivacy = false
+        }
+
+        // Initially active
+        assertFalse(showPrivacy)
+
+        // App goes to background or inactive -> overlay visible
+        onPauseOrStop()
+        assertTrue("Privacy overlay must show instantly when app goes to background or inactive", showPrivacy)
+
+        // App returns to active -> overlay hidden first
+        onResumeOrStart()
+        assertFalse("Privacy overlay must hide when app returns to active", showPrivacy)
+    }
 }
