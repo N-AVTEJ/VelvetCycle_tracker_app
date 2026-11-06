@@ -62,6 +62,7 @@ fun HomeScreen(
     val currentCycleDay = CycleEngine.getCurrentCycleDay(lastPeriodStart, cycleLength, today)
     val currentPhase = CycleEngine.getCurrentPhase(lastPeriodStart, cycleLength, periodDuration, today)
     val daysUntilNextPeriod = CycleEngine.getDaysUntilNextPeriod(lastPeriodStart, cycleLength, today)
+    val isDayBefore = CycleEngine.isDayBeforePeriod(lastPeriodStart, cycleLength, today)
 
     // Fertile Window Calculations
     val daysBetween = java.time.temporal.ChronoUnit.DAYS.between(lastPeriodStart, today)
@@ -157,12 +158,17 @@ fun HomeScreen(
             }
         }
 
-        // --- Pad Reminder Banner (Phase 3 Requirement 4) ---
-        AnimatedVisibility(
-            visible = daysUntilNextPeriod == 1 || daysUntilNextPeriod == 2,
-            enter = expandVertically(),
-            exit = shrinkVertically()
-        ) {
+        if (isDayBefore) {
+            // Special Day Before Period state: Replaces all normal cards with the 5 special cards
+            DayBeforePeriodSpecialView()
+        } else {
+            // --- Normal cards displayed on all other days ---
+            // --- Pad Reminder Banner (Phase 3 Requirement 4) ---
+            AnimatedVisibility(
+                visible = daysUntilNextPeriod == 1 || daysUntilNextPeriod == 2,
+                enter = expandVertically(),
+                exit = shrinkVertically()
+            ) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -641,6 +647,7 @@ fun HomeScreen(
                     lineHeight = 18.sp
                 )
             }
+        }
         }
     }
 }
