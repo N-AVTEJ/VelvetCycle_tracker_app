@@ -85,9 +85,49 @@ object CycleEngine {
 
     /**
      * Returns true if today is exactly the day before the predicted next period date.
+     * Logic from Phase 14:
+     * daysSinceLast = today - last
+     * currentCycleDay = (daysSinceLast % cycleLength) + 1
+     * daysUntilNext = cycleLength - currentCycleDay
+     * return daysUntilNext == 1
      */
     fun isDayBeforePeriod(lastPeriodStart: LocalDate, cycleLength: Int, today: LocalDate = LocalDate.now()): Boolean {
-        val nextPeriod = getNextPeriodDateProjected(lastPeriodStart, cycleLength, today)
-        return today.plusDays(1) == nextPeriod
+        val daysSinceLast = ChronoUnit.DAYS.between(lastPeriodStart, today)
+        if (daysSinceLast < 0) return false
+        val currentCycleDay = ((daysSinceLast % cycleLength).toInt()) + 1
+        val daysUntilNext = cycleLength - currentCycleDay
+        return daysUntilNext == 1
+    }
+
+    /**
+     * Overload accepting String lastPeriodStart (YYYY-MM-DD).
+     */
+    fun isDayBeforePeriod(lastPeriodStartStr: String, cycleLength: Int, today: LocalDate = LocalDate.now()): Boolean {
+        return try {
+            val last = LocalDate.parse(lastPeriodStartStr)
+            isDayBeforePeriod(last, cycleLength, today)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /**
+     * Returns the exact date of the day before next period:
+     * const nextPeriod = getNextPeriodDate(lastPeriodStart, cycleLength)
+     * const prepDay = new Date(nextPeriod)
+     * prepDay.setDate(prepDay.getDate() - 1)
+     * return prepDay
+     */
+    fun getPrepDay(lastPeriodStart: LocalDate, cycleLength: Int): LocalDate {
+        val nextPeriod = getNextPeriodDate(lastPeriodStart, cycleLength)
+        return nextPeriod.minusDays(1)
+    }
+
+    /**
+     * Overload accepting String lastPeriodStart (YYYY-MM-DD).
+     */
+    fun getPrepDay(lastPeriodStartStr: String, cycleLength: Int): LocalDate {
+        val last = try { LocalDate.parse(lastPeriodStartStr) } catch (e: Exception) { LocalDate.now() }
+        return getPrepDay(last, cycleLength)
     }
 }
