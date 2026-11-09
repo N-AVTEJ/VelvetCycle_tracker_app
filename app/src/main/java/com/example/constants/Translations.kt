@@ -165,7 +165,12 @@ object Translations {
             "tip_6" to "A heating pad on your lower back tonight helps a lot.",
             "store_blinkit" to "Blinkit",
             "store_zepto" to "Zepto",
-            "period_expected_tomorrow_log" to "Period expected tomorrow. Log how you feel today — it helps track PMS patterns.",
+            "period_expected_tomorrow_log" to "Period expected tomorrow. Log how you feel — it helps track PMS patterns.",
+            "day_before_body" to "Your cycle is completing today. Hormone levels are dropping which causes PMS. Completely normal — your body is preparing to reset.",
+            "day_before_food_morning" to "Banana, warm oats, ginger tea. No coffee.",
+            "day_before_food_afternoon" to "Light meal. Sweet potato or brown rice. No salt or junk food.",
+            "day_before_food_evening" to "Warm soup or khichdi. Chamomile tea before bed. Eat early.",
+            "day_before_exercise" to "No intense workout. Gentle yoga only. Child pose and cat-cow. Rest is more important than exercise today.",
             "prepare_day" to "Prepare day"
         ),
         "हिंदी" to mapOf(
@@ -327,6 +332,11 @@ object Translations {
             "store_blinkit" to "ब्लिंकिट",
             "store_zepto" to "ज़ेप्टो",
             "period_expected_tomorrow_log" to "कल मासिक धर्म अपेक्षित है। आज आप कैसा महसूस कर रही हैं, इसे लॉग करें — यह पीएमएस पैटर्न को समझने में मदद करता है।",
+            "day_before_body" to "आपका चक्र आज पूरा हो रहा है। हार्मोन का स्तर गिर रहा है जिससे पीएमएस होता है। पूरी तरह से सामान्य — आपका शरीर रीसेट होने की तैयारी कर रहा है।",
+            "day_before_food_morning" to "केला, गर्म ओट्स, अदरक की चाय। कोई कॉफी नहीं।",
+            "day_before_food_afternoon" to "हल्का भोजन। शकरकंद या ब्राउन राइस। कोई नमक या जंक फूड नहीं।",
+            "day_before_food_evening" to "गर्म सूप या खिचड़ी। सोने से पहले कैमोमाइल चाय। जल्दी खाएं।",
+            "day_before_exercise" to "कोई भारी कसरत नहीं। केवल सौम्य योग। बालासन और बिल्ली-गाय मुद्रा। आज व्यायाम से ज्यादा आराम जरूरी है।",
             "prepare_day" to "तैयारी का दिन"
         ),
         "తెలుగు" to mapOf(
@@ -488,6 +498,11 @@ object Translations {
             "store_blinkit" to "బ్లింకిట్",
             "store_zepto" to "జెప్టో",
             "period_expected_tomorrow_log" to "రేపు పీరియడ్ రావచ్చు. ఈ రోజు మీ భావనలను లాగ్ చేయండి — ఇది PMS ప్యాటర్న్స్‌ను అర్థం చేసుకోవడానికి సహాయపడుతుంది.",
+            "day_before_body" to "మీ సైకిల్ ఈ రోజుతో పూర్తవుతోంది. హార్మోన్ల స్థాయిలు పడిపోవడం వల్ల PMS లక్షణాలు కనిపిస్తాయి. ఇది పూర్తిగా సహజం — మీ శరీరం రీసెట్ కావడానికి సిద్ధమవుతోంది.",
+            "day_before_food_morning" to "అరటిపండు, వేడి ఓట్స్, అల్లం టీ. కాఫీ వద్దు.",
+            "day_before_food_afternoon" to "తేలికపాటి భోజనం. చిలగడదుంప లేదా బ్రౌన్ రైస్. ఉప్పు, జంక్ ఫుడ్ వద్దు.",
+            "day_before_food_evening" to "వేడి సూప్ లేదా కిచిడీ. పడుకునే ముందు చేమంతి టీ. త్వరగా తినండి.",
+            "day_before_exercise" to "తీవ్రమైన వ్యాయామాలు వద్దు. తేలికపాటి యోగా మాత్రమే. బాలాసనం మరియు పిల్లి-ఆవు స్ట్రెచ్. ఈ రోజు వ్యాయామం కంటే విశ్రాంతే ముఖ్యం.",
             "prepare_day" to "సిద్ధమవ్వాల్సిన రోజు"
         )
     )

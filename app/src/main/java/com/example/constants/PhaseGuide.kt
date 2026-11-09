@@ -40,15 +40,27 @@ object PhaseGuide {
         )
     )
 
+    val dayBeforeGuide = PhaseGuideData(
+        body = "Your cycle is completing today. Hormone levels are dropping which causes PMS. Completely normal — your body is preparing to reset.",
+        foodMorning = "Banana, warm oats, ginger tea. No coffee.",
+        foodAfternoon = "Light meal. Sweet potato or brown rice. No salt or junk food.",
+        foodEvening = "Warm soup or khichdi. Chamomile tea before bed. Eat early.",
+        exercise = "No intense workout. Gentle yoga only. Child pose and cat-cow. Rest is more important than exercise today."
+    )
+
+    val selfCareTips = listOf(
+        "Take a warm bath tonight. It relaxes the uterine muscles.",
+        "Drink warm water with lemon and ginger before bed.",
+        "Avoid salty snacks today — they increase bloating tomorrow.",
+        "Light stretching before sleep reduces morning cramps.",
+        "Sleep early tonight. Your body needs extra rest.",
+        "Avoid caffeine today — it worsens cramps.",
+        "A heating pad on your lower back tonight helps a lot."
+    )
+
     fun getGuide(phase: String, isDayBefore: Boolean = false): PhaseGuideData {
         if (isDayBefore) {
-            return PhaseGuideData(
-                body = "Your cycle is completing today. Hormones are dropping which causes PMS. Completely normal — your body is preparing to reset.",
-                foodMorning = "Banana, warm oats, ginger tea. No coffee.",
-                foodAfternoon = "Light meal. Sweet potato or brown rice. No salt or junk food.",
-                foodEvening = "Warm soup or khichdi. Chamomile tea before bed. Eat early.",
-                exercise = "No intense workout. Gentle yoga only. Child's pose and cat-cow. Rest is more important than exercise today."
-            )
+            return dayBeforeGuide
         }
         return guides[phase.lowercase()] ?: PhaseGuideData(
             body = "Stay tuned to your body's natural cycle and practice self-care.",

@@ -93,33 +93,50 @@ fun HomeScreen(
     val nutritionLabel = if (lang == "हिंदी") "पोषण योजना" else if (lang == "తెలుగు") "ఆహార ప్రణాళిక" else "NUTRITION PLAN"
     val exerciseLabelText = if (lang == "हिंदी") "व्यायाम सलाह" else if (lang == "తెలుగు") "వ్యాయామ సలహా" else "WORKOUT ADVICE"
 
-    // Phase Descriptions and Titles
-    val phaseTitle = Translations.t(currentPhase.lowercase(), lang)
-    val phaseDescription = Translations.t("phase_desc_" + currentPhase.lowercase(), lang)
+    // Phase Descriptions and Titles (with Day Before Period Override)
+    val phaseTitle = if (isDayBefore) {
+        if (lang == "हिंदी") "तैयारी का दिन" else if (lang == "తెలుగు") "సిద్ధమవ్వాల్సిన రోజు" else "Day Before Period"
+    } else {
+        Translations.t(currentPhase.lowercase(), lang)
+    }
 
-    // Localized Phase Guide Data
-    val foodMorning = when (currentPhase.lowercase()) {
+    val phaseDescription = if (isDayBefore) {
+        Translations.t("day_before_body", lang)
+    } else {
+        Translations.t("phase_desc_" + currentPhase.lowercase(), lang)
+    }
+
+    // Localized Phase Guide Data (with Day Before Period Override)
+    val foodMorning = if (isDayBefore) {
+        Translations.t("day_before_food_morning", lang)
+    } else when (currentPhase.lowercase()) {
         "menstruation" -> if (lang == "हिंदी") "आयरन से भरपूर खाद्य पदार्थ — पालक, खजूर, अनार का रस, चुकंदर" else if (lang == "తెలుగు") "ఐరన్ ఎక్కువగా ఉండే ఆహారం — పాలకూర, ఖర్జూరాలు, దానిమ్మ జ్యూస్, బీట్‌రూట్" else "Iron-rich foods — spinach, dates, pomegranate juice, beetroot"
         "follicular" -> if (lang == "हिंदी") "ताजे फल, अंकुरित अनाज, दही, हरी सब्जियां" else if (lang == "తెలుగు") "తాజా పండ్లు, మొలకలు, పెరుగు, ఆకుకూరలు" else "Fresh fruits, sprouts, yogurt, green vegetables"
         "ovulation" -> if (lang == "हिंदी") "साबुत अनाज, फल, सलाद, बादाम, अखरोट" else if (lang == "తెలుగు") "ధాన్యాలు, పండ్లు, సలాడ్స్, బాదం, అక్రోట్" else "Whole grains, fruit salads, almonds, walnuts"
         else -> if (lang == "हिंदी") "फाइबर युक्त खाद्य पदार्थ — दलिया, शकरकंद, मैग्नीशियम" else if (lang == "తెలుగు") "పీచు పదార్థాలు — ఓట్స్, చిలగడదుంప, మెగ్నీషియం" else "Fiber-rich foods — oats, sweet potatoes, magnesium"
     }
 
-    val foodAfternoon = when (currentPhase.lowercase()) {
+    val foodAfternoon = if (isDayBefore) {
+        Translations.t("day_before_food_afternoon", lang)
+    } else when (currentPhase.lowercase()) {
         "menstruation" -> if (lang == "हिंदी") "डार्क चॉकलेट, अदरक की चाय, गर्म नींबू पानी" else if (lang == "తెలుగు") "డార్క్ చాక్లెట్, అల్లం టీ, గోరువెచ్చని నిమ్మరసం" else "Dark chocolate, ginger tea, warm lemon water"
         "follicular" -> if (lang == "हिंदी") "मिश्रित मेवे, कद्दू के बीज, नारियल पानी" else if (lang == "తెలుగు") "గింజలు, గుమ్మడికాయ విత్తనాలు, కొబ్బరి నీరు" else "Mixed nuts, pumpkin seeds, coconut water"
         "ovulation" -> if (lang == "हिंदी") "अंजीर, जामुन, अलसी के बीज का काढ़ा" else if (lang == "తెలుగు") "అంజీర పండ్లు, బెర్రీస్, అవిసె గింజలు" else "Figs, berries, flax seeds smoothie"
         else -> if (lang == "हिंदी") "कद्दू के बीज, कैमोमाइल हर्बल चाय" else if (lang == "తెలుగు") "గుమ్మడికాయ విత్తనాలు, చేమంతి టీ" else "Pumpkin seeds, chamomile herbal tea"
     }
 
-    val foodEvening = when (currentPhase.lowercase()) {
+    val foodEvening = if (isDayBefore) {
+        Translations.t("day_before_food_evening", lang)
+    } else when (currentPhase.lowercase()) {
         "menstruation" -> if (lang == "हिंदी") "गर्म सूप, खिचड़ी, हल्का दाल चावल। ठंडा या तीखा भोजन न करें।" else if (lang == "తెలుగు") "వేడి సూప్, కిచిడీ, పప్పు అన్నం. చల్లని లేదా కారంగా ఉండే ఆహారం వద్దు." else "Warm soup, khichdi, light dal rice. Avoid cold or spicy food."
         "follicular" -> if (lang == "हिंदी") "भुनी हुई सब्जियां, ग्रिल्ड प्रोटीन, ब्राउन राइस" else if (lang == "తెలుగు") "కూరగాయలు, గ్రిల్డ్ ప్రోటీన్, బ్రౌన్ రైస్" else "Roasted vegetables, grilled protein, brown rice"
         "ovulation" -> if (lang == "हिंदी") "हरी पत्तेदार सब्जियां, क्विनोआ सलाद, सूप" else if (lang == "తెలుగు") "ఆకుకూరలు, క్వినోవా సలాడ్, వేడి సూప్" else "Leafy greens, quinoa salad, clear soup"
         else -> if (lang == "हिंदी") "भुनी हुई शकरकंद, हर्बल सूप, मूंग दाल खिचड़ी" else if (lang == "తెలుగు") "చిలగడదుంప ఫ్రై, హెర్బల్ సూప్, పెసరపప్పు కిచిడీ" else "Baked sweet potato, herbal soup, mung dal khichdi"
     }
 
-    val workoutAdvice = when (currentPhase.lowercase()) {
+    val workoutAdvice = if (isDayBefore) {
+        Translations.t("day_before_exercise", lang)
+    } else when (currentPhase.lowercase()) {
         "menstruation" -> if (lang == "हिंदी") "बालासन, बिल्ली-गाय खिंचाव, धीमी सैर। कठिन व्यायाम से बचें।" else if (lang == "తెలుగు") "బాలాసనం, పిల్లి-ఆవు స్ట్రెచ్, నెమ్మదిగా నడవడం. కఠినమైన వ్యాయామాలు వద్దు." else "Child's pose, cat-cow stretch, slow walk. Avoid heavy lifting."
         "follicular" -> if (lang == "हिंदी") "रनिंग, कार्डियो, सूर्य नमस्कार, लाइट वेट ट्रेनिंग" else if (lang == "తెలుగు") "రన్నింగ్, కార్డియో, సూర్య నమస్కారాలు, తేలికపాటి వెయిట్స్" else "Running, cardio, Surya Namaskar, light weight training"
         "ovulation" -> if (lang == "हिंदी") "हाई-इंटेंसिटी इंटरवल ट्रेनिंग (HIIT), स्ट्रेंथ ट्रेनिंग, ज़ुम्बा" else if (lang == "తెలుగు") "హై-ఇంటెన్సిటీ వ్యాయామాలు (HIIT), స్ట్రెంగ్త్ ట్రైనింగ్, జుంబా" else "High-intensity interval training (HIIT), strength training, Zumba"
