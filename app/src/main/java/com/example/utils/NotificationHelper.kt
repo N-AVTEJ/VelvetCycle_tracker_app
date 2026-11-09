@@ -16,6 +16,7 @@ import java.time.ZoneId
 object NotificationHelper {
     private const val TAG = "NotificationHelper"
     const val CHANNEL_ID = "VelvetCycleReminders"
+    const val DEFAULT_CHANNEL_ID = "velvetcycle-default"
     const val CHANNEL_NAME = "VelvetCycle Reminders"
 
     const val ID_PERIOD_REMINDER = 1001
@@ -27,12 +28,19 @@ object NotificationHelper {
 
     fun createNotificationChannel(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val importance = NotificationManager.IMPORTANCE_DEFAULT
+
             val channel = NotificationChannel(CHANNEL_ID, CHANNEL_NAME, importance).apply {
                 description = "VelvetCycle notifications for period, ovulation, and daily logs."
             }
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
+
+            // Default channel for Expo / system compatibility
+            val defaultChannel = NotificationChannel(DEFAULT_CHANNEL_ID, CHANNEL_NAME, importance).apply {
+                description = "VelvetCycle default notification channel."
+            }
+            notificationManager.createNotificationChannel(defaultChannel)
         }
     }
 
@@ -168,7 +176,41 @@ object NotificationHelper {
             cancelAlarm(context, ID_PAD_REMINDER)
         }
 
-        // Day Before Period notifications have been unified with the main Period Reminder logic
+        // 5. Day Before Period — Morning Warning: 08:00 AM on prepDay
+        var prepDay = CycleEngine.getPrepDay(lastPeriodStart, cycleLength)
+        var morningTriggerTime = getTriggerTimeMillis(prepDay, 8, 0)
+        if (morningTriggerTime <= System.currentTimeMillis()) {
+            // If already passed for current cycle, project to the next cycle's prepDay
+            val nextPeriodDate = CycleEngine.getNextPeriodDateProjected(lastPeriodStart, cycleLength)
+            val nextPrepDay = nextPeriodDate.plusDays(cycleLength.toLong()).minusDays(1)
+            morningTriggerTime = getTriggerTimeMillis(nextPrepDay, 8, 0)
+        }
+        Log.d(TAG, "Scheduling Day Before Period Morning alert at 08:00 AM: $morningTriggerTime ms")
+        scheduleAlarm(
+            context = context,
+            id = ID_DAY_BEFORE_MORNING,
+            triggerTimeMs = morningTriggerTime,
+            title = "Period starts tomorrow 🌸",
+            body = "Your period is expected tomorrow. Check your pad stock and plan a gentle day.",
+            channelId = DEFAULT_CHANNEL_ID
+        )
+
+        // 6. Day Before Period — Evening Reminder: 21:00 (9:00 PM) on prepDay
+        var eveningTriggerTime = getTriggerTimeMillis(prepDay, 21, 0)
+        if (eveningTriggerTime <= System.currentTimeMillis()) {
+            val nextPeriodDate = CycleEngine.getNextPeriodDateProjected(lastPeriodStart, cycleLength)
+            val nextPrepDay = nextPeriodDate.plusDays(cycleLength.toLong()).minusDays(1)
+            eveningTriggerTime = getTriggerTimeMillis(nextPrepDay, 21, 0)
+        }
+        Log.d(TAG, "Scheduling Day Before Period Evening reminder at 21:00 (9:00 PM): $eveningTriggerTime ms")
+        scheduleAlarm(
+            context = context,
+            id = ID_DAY_BEFORE_EVENING,
+            triggerTimeMs = eveningTriggerTime,
+            title = "Gentle reminder 🌙",
+            body = "Period tomorrow. Warm bath, ginger tea, early sleep. You have got this. 💕",
+            channelId = DEFAULT_CHANNEL_ID
+        )
         
         Log.d(TAG, "All notifications successfully scheduled/updated with timezone safety.")
     }
@@ -198,7 +240,8 @@ object NotificationHelper {
         id: Int,
         triggerTimeMs: Long,
         title: String,
-        body: String
+        body: String,
+        channelId: String = CHANNEL_ID
     ) {
         Log.d(TAG, "scheduleAlarm invoked for ID: $id. Trigger time: $triggerTimeMs ms (${java.time.Instant.ofEpochMilli(triggerTimeMs)})")
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
@@ -206,6 +249,7 @@ object NotificationHelper {
             putExtra("notif_id", id)
             putExtra("notif_title", title)
             putExtra("notif_body", body)
+            putExtra("notif_channel_id", channelId)
         }
         
         val pendingIntent = PendingIntent.getBroadcast(

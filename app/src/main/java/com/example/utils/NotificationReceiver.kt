@@ -26,8 +26,9 @@ class NotificationReceiver : BroadcastReceiver() {
         val id = intent.getIntExtra("notif_id", 0)
         val title = intent.getStringExtra("notif_title") ?: "VelvetCycle"
         val body = intent.getStringExtra("notif_body") ?: "Your cycle health update."
+        val channelId = intent.getStringExtra("notif_channel_id") ?: NotificationHelper.CHANNEL_ID
 
-        Log.d(TAG, "onReceive triggered for alarm/notification ID: $id. Title: \"$title\", Body: \"$body\"")
+        Log.d(TAG, "onReceive triggered for alarm/notification ID: $id. Title: \"$title\", Body: \"$body\", Channel: \"$channelId\"")
 
         // Log permission status
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -51,7 +52,7 @@ class NotificationReceiver : BroadcastReceiver() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val builder = NotificationCompat.Builder(context, NotificationHelper.CHANNEL_ID)
+        val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setContentTitle(title)
             .setContentText(body)

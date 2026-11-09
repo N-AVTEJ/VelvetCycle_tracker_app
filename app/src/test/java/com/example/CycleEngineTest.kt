@@ -113,4 +113,16 @@ class CycleEngineTest {
         assertEquals(expectedPrepDay, CycleEngine.getPrepDay(lastPeriodStart, cycleLength))
         assertEquals(expectedPrepDay, CycleEngine.getPrepDay(lastPeriodStart.toString(), cycleLength))
     }
+
+    @Test
+    fun notifications_prepDayCalculationMatchesTomorrow() {
+        // Set lastPeriodStart so day before next period is tomorrow
+        val today = LocalDate.now()
+        val cycleLength = 28
+        // Next period is today + 2 days, so prepDay is tomorrow (today + 1 day)
+        // lastPeriodStart = nextPeriod - 28 = (today + 2) - 28 = today - 26
+        val lastPeriodStart = today.minusDays(26)
+        val prepDay = CycleEngine.getPrepDay(lastPeriodStart, cycleLength)
+        assertEquals(today.plusDays(1), prepDay)
+    }
 }
