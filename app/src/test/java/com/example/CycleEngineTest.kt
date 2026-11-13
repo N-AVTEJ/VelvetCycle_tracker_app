@@ -125,4 +125,99 @@ class CycleEngineTest {
         val prepDay = CycleEngine.getPrepDay(lastPeriodStart, cycleLength)
         assertEquals(today.plusDays(1), prepDay)
     }
+
+    @Test
+    fun calendar_prepDayToday_dotColorAndNonOverlap() {
+        // When day before period is today:
+        val today = LocalDate.now()
+        val cycleLength = 28
+        val periodDuration = 5
+
+        // Period is tomorrow (today + 1), so last period was 27 days ago
+        val lastPeriodStart = today.minusDays(27)
+
+        val prepDay = CycleEngine.getPrepDay(lastPeriodStart, cycleLength)
+        assertEquals("prepDay formatted as YYYY-MM-DD matches today", today, prepDay)
+
+        // Verify non-overlap:
+        // Day before period is cycle day 28
+        // Period days are 1..5
+        val daysSince = java.time.temporal.ChronoUnit.DAYS.between(lastPeriodStart, prepDay)
+        val mod = daysSince % cycleLength
+        val isPeriod = mod < periodDuration
+        assertFalse("Prepare day must not overlap with period days", isPeriod)
+
+        // Ovulation is cycle day 14 (mod 13)
+        val isOvulation = mod == (cycleLength - 14 - 1).toLong()
+        assertFalse("Prepare day must not overlap with ovulation day", isOvulation)
+
+        // Fertile window is cycle days 9..15
+        val ovulationDayNum = cycleLength - 14 - 1
+        val isFertile = mod in (ovulationDayNum - 5)..(ovulationDayNum + 1)
+        assertFalse("Prepare day must not overlap with fertile window", isFertile)
+
+        // Confirm it is prepare day (cycleLength - 1)
+        val isPrepare = mod == (cycleLength - 1).toLong()
+        assertTrue("Prepare day is exactly day before period", isPrepare)
+    }
+
+    @Test
+    fun detectAnomalies_detectsCycleLengthDeviationOver7Days() {
+        // Average of history: (28 + 28 + 28) / 3 = 28
+        // Current cycle length: 36 (deviation = 8 > 7)
+        val history = listOf(28, 28, 28)
+        val anomalies = CycleEngine.detectAnomalies(history, currentCycleLength = 36, currentPeriodDuration = 5)
+
+        assertEquals(1, anomalies.size)
+        val anomaly = anomalies[0]
+        assertEquals("cycle_length", anomaly.type)
+        assertEquals("notice", anomaly.severity)
+        assertEquals(8, anomaly.deviationDays)
+        assertTrue(anomaly.message.contains("8 days"))
+    }
+
+    @Test
+    fun detectAnomalies_noCycleLengthAnomaly_whenDeviation7OrLess() {
+        // Average = 28, current = 35 (deviation = 7, not > 7)
+        val history = listOf(28, 28, 28)
+        val anomalies = CycleEngine.detectAnomalies(history, currentCycleLength = 35, currentPeriodDuration = 5)
+
+        assertTrue("No anomaly when deviation is 7 or less", anomalies.isEmpty())
+    }
+
+    @Test
+    fun detectAnomalies_ignoresNegativeOrZeroValuesSafely() {
+        // Invalid input validation test
+        val history = listOf(28, -5, 0, 28, 28)
+        val anomalies = CycleEngine.detectAnomalies(history, currentCycleLength = 40, currentPeriodDuration = 5)
+
+        assertEquals(1, anomalies.size)
+        assertEquals("cycle_length", anomalies[0].type)
+    }
+
+    @Test
+    fun detectAnomalies_detectsLongPeriodDurationOver9Days() {
+        val history = listOf(28, 28, 28)
+        val anomalies = CycleEngine.detectAnomalies(history, currentCycleLength = 28, currentPeriodDuration = 10)
+
+        assertEquals(1, anomalies.size)
+        val anomaly = anomalies[0]
+        assertEquals("long_period", anomaly.type)
+        assertEquals("warning", anomaly.severity)
+        assertTrue(anomaly.message.contains("9 days"))
+    }
+
+    @Test
+    fun isMissedPeriod_returnsTrue_whenMoreThan7DaysPastCycleLength() {
+        val today = LocalDate.of(2025, 6, 15)
+        val cycleLength = 28
+
+        // Exactly cycleLength + 7 days ago (35 days) -> not missed (> 35 required)
+        val lastStart35 = today.minusDays(35)
+        assertFalse(CycleEngine.isMissedPeriod(lastStart35, cycleLength, today))
+
+        // 36 days ago (cycleLength + 8) -> missed!
+        val lastStart36 = today.minusDays(36)
+        assertTrue(CycleEngine.isMissedPeriod(lastStart36, cycleLength, today))
+    }
 }

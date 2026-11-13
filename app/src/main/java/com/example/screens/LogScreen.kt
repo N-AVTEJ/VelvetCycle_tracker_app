@@ -69,15 +69,15 @@ fun LogScreen(storageHelper: StorageHelper) {
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color(0xFFFFF3E0))
                     .border(1.dp, Color(0xFFFFB74D), RoundedCornerShape(12.dp))
-                    .padding(16.dp)
+                    .padding(12.dp)
                     .testTag("day_before_banner_log")
             ) {
                 Text(
                     text = Translations.t("period_expected_tomorrow_log", lang),
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = Color(0xFFE65100),
-                    lineHeight = 20.sp
+                    lineHeight = 18.sp
                 )
             }
         }

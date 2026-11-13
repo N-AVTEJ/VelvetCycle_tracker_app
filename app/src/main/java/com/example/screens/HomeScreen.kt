@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -63,6 +64,18 @@ fun HomeScreen(
     val currentPhase = CycleEngine.getCurrentPhase(lastPeriodStart, cycleLength, periodDuration, today)
     val daysUntilNextPeriod = CycleEngine.getDaysUntilNextPeriod(lastPeriodStart, cycleLength, today)
     val isDayBefore = CycleEngine.isDayBeforePeriod(lastPeriodStart, cycleLength, today)
+
+    // Phase 19: Anomaly detection and Missed Period calculation (local-only, encrypted SecureStore)
+    val cycleRecords = remember { storageHelper.getCycleHistory() }
+    val cycleHistory = remember(cycleRecords) {
+        cycleRecords.take(6).map { it.duration }.filter { it > 0 }
+    }
+    val anomalies = remember(cycleHistory, cycleLength, periodDuration) {
+        CycleEngine.detectAnomalies(cycleHistory, cycleLength, periodDuration)
+    }
+    val isMissed = remember(lastPeriodStart, cycleLength, today) {
+        CycleEngine.isMissedPeriod(lastPeriodStart, cycleLength, today)
+    }
 
     // Fertile Window Calculations
     val daysBetween = java.time.temporal.ChronoUnit.DAYS.between(lastPeriodStart, today)
@@ -180,6 +193,88 @@ fun HomeScreen(
             DayBeforePeriodSpecialView()
         } else {
             // --- Normal cards displayed on all other days ---
+
+            // --- Phase 19: Anomaly Card (Soft light yellow, never alarming) ---
+            if (anomalies.isNotEmpty()) {
+                val anomaly = anomalies.first()
+                val anomalyMsg = when (anomaly.type) {
+                    "cycle_length" -> Translations.t("anomaly_cycle_length", lang, anomaly.deviationDays)
+                    "long_period" -> Translations.t("anomaly_long_period", lang)
+                    else -> anomaly.message
+                }
+
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("anomaly_alert_card"),
+                    colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0xFFFFF8E1)),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, androidx.compose.ui.graphics.Color(0xFFFFE082))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = "ℹ️",
+                            fontSize = 20.sp
+                        )
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            Text(
+                                text = anomalyMsg,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = androidx.compose.ui.graphics.Color(0xFF5D4037),
+                                lineHeight = 19.sp
+                            )
+                            Text(
+                                text = Translations.t("anomaly_subtext", lang),
+                                fontSize = 12.sp,
+                                color = androidx.compose.ui.graphics.Color(0xFF8D6E63),
+                                lineHeight = 17.sp
+                            )
+                        }
+                    }
+                }
+            }
+
+            // --- Phase 19: Missed Period Card (Soft light orange) ---
+            if (isMissed) {
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("missed_period_card"),
+                    colors = CardDefaults.cardColors(containerColor = androidx.compose.ui.graphics.Color(0xFFFFF3E0)),
+                    shape = RoundedCornerShape(16.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, androidx.compose.ui.graphics.Color(0xFFFFCC80))
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.Top
+                    ) {
+                        Text(
+                            text = "🌸",
+                            fontSize = 20.sp
+                        )
+                        Text(
+                            text = Translations.t("missed_period_message", lang),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = androidx.compose.ui.graphics.Color(0xFFE65100),
+                            lineHeight = 20.sp
+                        )
+                    }
+                }
+            }
+
             // --- Pad Reminder Banner (Phase 3 Requirement 4) ---
             AnimatedVisibility(
                 visible = daysUntilNextPeriod == 1 || daysUntilNextPeriod == 2,

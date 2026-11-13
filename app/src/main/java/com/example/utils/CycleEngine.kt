@@ -130,4 +130,75 @@ object CycleEngine {
         val last = try { LocalDate.parse(lastPeriodStartStr) } catch (e: Exception) { LocalDate.now() }
         return getPrepDay(last, cycleLength)
     }
+
+    /**
+     * Detects cycle anomalies based on user's cycle history.
+     * Validates inputs: non-numeric or non-positive values are filtered out.
+     * Pure local calculation, no analytics or network calls.
+     */
+    fun detectAnomalies(
+        cycleHistory: List<Int>,
+        currentCycleLength: Int,
+        currentPeriodDuration: Int
+    ): List<Anomaly> {
+        val anomalies = mutableListOf<Anomaly>()
+
+        // Validate and filter positive valid cycle lengths
+        val validHistory = cycleHistory.filter { it > 0 }
+
+        if (validHistory.size >= 3) {
+            val avg = validHistory.sum().toDouble() / validHistory.size
+            val deviation = Math.abs(currentCycleLength - avg)
+
+            if (deviation > 7) {
+                val roundedDeviation = Math.round(deviation).toInt()
+                anomalies.add(
+                    Anomaly(
+                        type = "cycle_length",
+                        severity = "notice",
+                        message = "This cycle is longer/shorter than usual for you by $roundedDeviation days.",
+                        deviationDays = roundedDeviation
+                    )
+                )
+            }
+        }
+
+        if (currentPeriodDuration > 9) {
+            anomalies.add(
+                Anomaly(
+                    type = "long_period",
+                    severity = "warning",
+                    message = "Your period has lasted longer than 9 days. This is worth noting.",
+                    deviationDays = 0
+                )
+            )
+        }
+
+        return anomalies
+    }
+
+    /**
+     * Returns true if today is more than 7 days past the predicted cycle length.
+     * daysSinceLast = Math.floor((new Date() - new Date(lastPeriodStart)) / 86400000)
+     * return daysSinceLast > cycleLength + 7
+     */
+    fun isMissedPeriod(lastPeriodStart: LocalDate, cycleLength: Int, today: LocalDate = LocalDate.now()): Boolean {
+        val daysSinceLast = ChronoUnit.DAYS.between(lastPeriodStart, today)
+        return daysSinceLast > (cycleLength + 7)
+    }
+
+    /**
+     * String overload for isMissedPeriod.
+     */
+    fun isMissedPeriod(lastPeriodStartStr: String, cycleLength: Int, today: LocalDate = LocalDate.now()): Boolean {
+        val last = try { LocalDate.parse(lastPeriodStartStr) } catch (e: Exception) { return false }
+        return isMissedPeriod(last, cycleLength, today)
+    }
 }
+
+data class Anomaly(
+    val type: String,
+    val severity: String,
+    val message: String,
+    val deviationDays: Int = 0
+)

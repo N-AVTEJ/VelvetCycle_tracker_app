@@ -566,13 +566,13 @@ fun CalendarScreen(
                     horizontalArrangement = Arrangement.spacedBy(16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    val labelPeriod = if (lang == "हिंदी") "मासिक धर्म का दिन" else if (lang == "తెలుగు") "పీరియడ్ రోజు" else "Period day"
+                    val labelPeriod = if (lang == "हिंदी") "मासिक धर्म के दिन" else if (lang == "తెలుగు") "పీరియడ్ రోజులు" else "Period days"
                     val labelFertile = if (lang == "हिंदी") "उर्वर अवधि" else if (lang == "తెలుగు") "సంతానోత్పత్తి సమయం" else "Fertile window"
-                    val labelOvulation = if (lang == "हिंदी") "डिंबोत्सर्जन दिवस" else if (lang == "తెలుగు") "అండవిడుదల రోజు" else "Ovulation day"
-                    val labelPrepare = Translations.t("prepare_day", lang)
+                    val labelOvulation = if (lang == "हिंदी") "डिंबोत्सर्जन दिवस" else if (lang == "తెలుగు") "అండవిడుదల రోజు" else "Ovulation"
+                    val labelPrepare = if (lang == "हिंदी") "तैयारी का दिन" else if (lang == "తెలుగు") "సిద్ధమవ్వాల్సిన రోజు" else "Prepare day"
 
-                    LegendItem(color = SecondaryPink, label = labelPeriod, isDot = false)
-                    LegendItem(color = FertileGreen, label = labelFertile, isDot = false)
+                    LegendItem(color = SecondaryPink, label = labelPeriod, isDot = true)
+                    LegendItem(color = FertileGreen, label = labelFertile, isDot = true)
                     LegendItem(color = Teal, label = labelOvulation, isDot = true)
                     LegendItem(color = Color(0xFFFF8C42), label = labelPrepare, isDot = true)
                 }

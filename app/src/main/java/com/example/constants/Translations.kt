@@ -171,7 +171,11 @@ object Translations {
             "day_before_food_afternoon" to "Light meal. Sweet potato or brown rice. No salt or junk food.",
             "day_before_food_evening" to "Warm soup or khichdi. Chamomile tea before bed. Eat early.",
             "day_before_exercise" to "No intense workout. Gentle yoga only. Child pose and cat-cow. Rest is more important than exercise today.",
-            "prepare_day" to "Prepare day"
+            "prepare_day" to "Prepare day",
+            "anomaly_subtext" to "This is just a pattern note, not a diagnosis. Everyone's cycle varies.",
+            "missed_period_message" to "Your period is more than a week late based on your pattern. Stress, travel, and lifestyle changes can affect timing.",
+            "anomaly_cycle_length" to "This cycle is longer/shorter than usual for you by %d days.",
+            "anomaly_long_period" to "Your period has lasted longer than 9 days. This is worth noting."
         ),
         "हिंदी" to mapOf(
             "app_name" to "वेलवेट साइकिल",
@@ -337,7 +341,11 @@ object Translations {
             "day_before_food_afternoon" to "हल्का भोजन। शकरकंद या ब्राउन राइस। कोई नमक या जंक फूड नहीं।",
             "day_before_food_evening" to "गर्म सूप या खिचड़ी। सोने से पहले कैमोमाइल चाय। जल्दी खाएं।",
             "day_before_exercise" to "कोई भारी कसरत नहीं। केवल सौम्य योग। बालासन और बिल्ली-गाय मुद्रा। आज व्यायाम से ज्यादा आराम जरूरी है।",
-            "prepare_day" to "तैयारी का दिन"
+            "prepare_day" to "तैयारी का दिन",
+            "anomaly_subtext" to "यह केवल एक पैटर्न नोट है, कोई निदान नहीं। हर किसी का चक्र अलग होता है।",
+            "missed_period_message" to "आपके पैटर्न के आधार पर आपका मासिक धर्म एक सप्ताह से अधिक देर से है। तनाव, यात्रा और जीवनशैली में बदलाव समय को प्रभावित कर सकते हैं।",
+            "anomaly_cycle_length" to "यह चक्र आपके सामान्य चक्र से लगभग %d दिन लंबा/छोटा है।",
+            "anomaly_long_period" to "आपका मासिक धर्म 9 दिनों से अधिक समय तक रहा है। इस पर ध्यान देना उचित है।"
         ),
         "తెలుగు" to mapOf(
             "app_name" to "వెల్వెట్ సైకిల్",
@@ -503,7 +511,11 @@ object Translations {
             "day_before_food_afternoon" to "తేలికపాటి భోజనం. చిలగడదుంప లేదా బ్రౌన్ రైస్. ఉప్పు, జంక్ ఫుడ్ వద్దు.",
             "day_before_food_evening" to "వేడి సూప్ లేదా కిచిడీ. పడుకునే ముందు చేమంతి టీ. త్వరగా తినండి.",
             "day_before_exercise" to "తీవ్రమైన వ్యాయామాలు వద్దు. తేలికపాటి యోగా మాత్రమే. బాలాసనం మరియు పిల్లి-ఆవు స్ట్రెచ్. ఈ రోజు వ్యాయామం కంటే విశ్రాంతే ముఖ్యం.",
-            "prepare_day" to "సిద్ధమవ్వాల్సిన రోజు"
+            "prepare_day" to "సిద్ధమవ్వాల్సిన రోజు",
+            "anomaly_subtext" to "ఇది కేవలం ఒక గమనిక మాత్రమే, రోగ నిర్ధారణ కాదు. ప్రతి ఒక్కరి సైకిల్ మారుతూ ఉంటుంది.",
+            "missed_period_message" to "మీ సాధారణ ప్యాటర్న్ కంటే మీ పీరియడ్ ఒక వారం కంటే ఎక్కువ ఆలస్యమైంది. ఒత్తిడి, ప్రయాణాలు మరియు జీవనశైలి మార్పులు సమయాన్ని ప్రభావితం చేయవచ్చు.",
+            "anomaly_cycle_length" to "ఈ సైకిల్ మీ సాధారణ సైకిల్ కంటే దాదాపు %d రోజులు ఎక్కువ/తక్కువగా ఉంది.",
+            "anomaly_long_period" to "మీ పీరియడ్ 9 రోజుల కంటే ఎక్కువ కాలం కొనసాగింది. ఇది గమనించదగినది."
         )
     )
 
