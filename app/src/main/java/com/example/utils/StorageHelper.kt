@@ -42,6 +42,7 @@ class StorageHelper(private val context: Context) {
         private const val KEY_USER_PIN = "user_pin"
         private const val KEY_BIOMETRIC_ENABLED = "biometric_enabled"
         private const val KEY_DISGUISE_MODE = "disguise_mode"
+        private const val KEY_DOCTOR_FLAG_DISMISSED_UNTIL = "doctor_flag_dismissed_until"
     }
 
     init {
@@ -238,6 +239,15 @@ class StorageHelper(private val context: Context) {
     var disguiseMode: Boolean
         get() = getSecure(KEY_DISGUISE_MODE)?.toBooleanStrictOrNull() ?: false
         set(value) { saveSecure(KEY_DISGUISE_MODE, value) }
+
+    // Health-pattern-derived dismissal timestamp stored strictly in encrypted SecureStore
+    var doctorFlagDismissedUntil: Long
+        get() = getSecure(KEY_DOCTOR_FLAG_DISMISSED_UNTIL)?.toLongOrNull() ?: 0L
+        set(value) { saveSecure(KEY_DOCTOR_FLAG_DISMISSED_UNTIL, value) }
+
+    fun dismissDoctorFlagFor30Days(nowMs: Long = System.currentTimeMillis()) {
+        doctorFlagDismissedUntil = nowMs + InsightsEngine.THIRTY_DAYS_MS
+    }
 
     // --- INDIVIDUAL DAILY LOG ENTRIES IN SECURESTORE (log_YYYY-MM-DD) ---
 

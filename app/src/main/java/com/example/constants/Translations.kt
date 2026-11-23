@@ -175,7 +175,18 @@ object Translations {
             "anomaly_subtext" to "This is just a pattern note, not a diagnosis. Everyone's cycle varies.",
             "missed_period_message" to "Your period is more than a week late based on your pattern. Stress, travel, and lifestyle changes can affect timing.",
             "anomaly_cycle_length" to "This cycle is longer/shorter than usual for you by %d days.",
-            "anomaly_long_period" to "Your period has lasted longer than 9 days. This is worth noting."
+            "anomaly_long_period" to "Your period has lasted longer than 9 days. This is worth noting.",
+            "sym_heavy_bleeding" to "Heavy bleeding",
+            "sym_severe_cramps" to "Severe cramps",
+            "sym_severe_pain" to "Severe pain",
+            "doctor_flag_title" to "Consider talking to a doctor",
+            "doctor_flag_body" to "You have logged severe symptoms across recent cycles. A doctor visit could help identify the cause and options for relief.",
+            "doctor_flag_checklist_title" to "Checklist to bring to your appointment:",
+            "doctor_flag_top_symptoms" to "Top symptoms logged",
+            "doctor_flag_last_3_periods" to "Dates of last 3 periods",
+            "doctor_flag_export_btn" to "Export this summary",
+            "doctor_flag_dismiss_btn" to "Not now",
+            "doctor_flag_none_logged" to "None logged"
         ),
         "हिंदी" to mapOf(
             "app_name" to "वेलवेट साइकिल",
@@ -345,7 +356,18 @@ object Translations {
             "anomaly_subtext" to "यह केवल एक पैटर्न नोट है, कोई निदान नहीं। हर किसी का चक्र अलग होता है।",
             "missed_period_message" to "आपके पैटर्न के आधार पर आपका मासिक धर्म एक सप्ताह से अधिक देर से है। तनाव, यात्रा और जीवनशैली में बदलाव समय को प्रभावित कर सकते हैं।",
             "anomaly_cycle_length" to "यह चक्र आपके सामान्य चक्र से लगभग %d दिन लंबा/छोटा है।",
-            "anomaly_long_period" to "आपका मासिक धर्म 9 दिनों से अधिक समय तक रहा है। इस पर ध्यान देना उचित है।"
+            "anomaly_long_period" to "आपका मासिक धर्म 9 दिनों से अधिक समय तक रहा है। इस पर ध्यान देना उचित है।",
+            "sym_heavy_bleeding" to "अत्यधिक रक्तस्राव",
+            "sym_severe_cramps" to "तेज ऐंठन",
+            "sym_severe_pain" to "तेज दर्द",
+            "doctor_flag_title" to "डॉक्टर से बात करने पर विचार करें",
+            "doctor_flag_body" to "आपने हाल के चक्रों में गंभीर लक्षण दर्ज किए हैं। डॉक्टर से मिलने से कारण और राहत के विकल्पों को समझने में मदद मिल सकती है।",
+            "doctor_flag_checklist_title" to "अपॉइंटमेंट के लिए तैयार चेकलिस्ट:",
+            "doctor_flag_top_symptoms" to "प्रमुख दर्ज लक्षण",
+            "doctor_flag_last_3_periods" to "पिछले 3 मासिक धर्म की तिथियां",
+            "doctor_flag_export_btn" to "यह सारांश साझा करें",
+            "doctor_flag_dismiss_btn" to "अभी नहीं",
+            "doctor_flag_none_logged" to "कोई दर्ज नहीं"
         ),
         "తెలుగు" to mapOf(
             "app_name" to "వెల్వెట్ సైకిల్",
@@ -515,7 +537,18 @@ object Translations {
             "anomaly_subtext" to "ఇది కేవలం ఒక గమనిక మాత్రమే, రోగ నిర్ధారణ కాదు. ప్రతి ఒక్కరి సైకిల్ మారుతూ ఉంటుంది.",
             "missed_period_message" to "మీ సాధారణ ప్యాటర్న్ కంటే మీ పీరియడ్ ఒక వారం కంటే ఎక్కువ ఆలస్యమైంది. ఒత్తిడి, ప్రయాణాలు మరియు జీవనశైలి మార్పులు సమయాన్ని ప్రభావితం చేయవచ్చు.",
             "anomaly_cycle_length" to "ఈ సైకిల్ మీ సాధారణ సైకిల్ కంటే దాదాపు %d రోజులు ఎక్కువ/తక్కువగా ఉంది.",
-            "anomaly_long_period" to "మీ పీరియడ్ 9 రోజుల కంటే ఎక్కువ కాలం కొనసాగింది. ఇది గమనించదగినది."
+            "anomaly_long_period" to "మీ పీరియడ్ 9 రోజుల కంటే ఎక్కువ కాలం కొనసాగింది. ఇది గమనించదగినది.",
+            "sym_heavy_bleeding" to "అధిక రక్తస్రావం",
+            "sym_severe_cramps" to "తీవ్రమైన కడుపునొప్పి",
+            "sym_severe_pain" to "తీవ్రమైన నొప్పి",
+            "doctor_flag_title" to "వైద్యుడిని సంప్రదించడాన్ని పరిశీలించండి",
+            "doctor_flag_body" to "ఇటీవలి చక్రాలలో మీరు తీవ్రమైన లక్షణాలను నమోదు చేశారు. వైద్యుడిని సంప్రదించడం వల్ల కారణం మరియు ఉపశమన మార్గాలను తెలుసుకోవచ్చు.",
+            "doctor_flag_checklist_title" to "వైద్యుడి అపాయింట్‌మెంట్ కోసం చెక్‌లిస్ట్:",
+            "doctor_flag_top_symptoms" to "ఎక్కువగా నమోదైన లక్షణాలు",
+            "doctor_flag_last_3_periods" to "చివరి 3 పీరియడ్ తేదీలు",
+            "doctor_flag_export_btn" to "ఈ సారాంశాన్ని షేర్ చేయండి",
+            "doctor_flag_dismiss_btn" to "ఇప్పుడు కాదు",
+            "doctor_flag_none_logged" to "ఏవీ నమోదు కాలేదు"
         )
     )
 

@@ -254,7 +254,8 @@ fun LogScreen(storageHelper: StorageHelper) {
 
                 val symptoms = listOf(
                     "Cramps", "Headache", "Bloating", "Fatigue", "Acne",
-                    "Back pain", "Nausea", "Breast tenderness", "Mood swings", "Insomnia"
+                    "Back pain", "Nausea", "Breast tenderness", "Mood swings", "Insomnia",
+                    "Heavy bleeding", "Severe cramps", "Severe pain"
                 )
 
                 FlowRow(
@@ -275,6 +276,9 @@ fun LogScreen(storageHelper: StorageHelper) {
                             "breast tenderness" -> Translations.t("sym_breast_tenderness", lang)
                             "insomnia" -> if (lang == "हिंदी") "अनिद्रा" else if (lang == "తెలుగు") "నిద్రలేమి" else "Insomnia"
                             "nausea" -> Translations.t("sym_nausea", lang)
+                            "heavy bleeding" -> Translations.t("sym_heavy_bleeding", lang)
+                            "severe cramps" -> Translations.t("sym_severe_cramps", lang)
+                            "severe pain" -> Translations.t("sym_severe_pain", lang)
                             else -> symptom
                         }
 

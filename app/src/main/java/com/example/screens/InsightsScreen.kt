@@ -1,23 +1,32 @@
 package com.example.screens
 
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Assignment
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -28,8 +37,10 @@ import com.example.LocalAppLanguage
 import com.example.constants.Translations
 import com.example.ui.theme.LocalVelvetColors
 import com.example.ui.theme.PrimaryPink
+import com.example.utils.InsightsEngine
 import com.example.utils.PdfExportHelper
 import com.example.utils.StorageHelper
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 @Composable
@@ -124,6 +135,59 @@ fun InsightsScreen(
             val totalTracked = cycleHistory.size
             val lastPeriodFormatted = Translations.formatDate(storageHelper.lastPeriodStart, lang)
 
+            // Aggregate symptoms once for both Doctor Flag checklist and Frequency chart
+            val symptomsMap = remember(logs) {
+                val map = mutableMapOf<String, Int>()
+                logs.values.forEach { log ->
+                    log.symptoms.forEach { s ->
+                        map[s] = (map[s] ?: 0) + 1
+                    }
+                }
+                map
+            }
+            val topSymptoms = remember(symptomsMap) {
+                symptomsMap.entries.sortedByDescending { it.value }.take(5)
+            }
+            val lastThreePeriodDates = remember(cycleHistory) {
+                cycleHistory.take(3).map { it.startDate }
+            }
+
+            // Phase 20: Symptom-to-Doctor Flag (strictly local, >=3 cycles required, 30-day SecureStore dismissal)
+            val doctorFlag = remember(logs, totalTracked) {
+                InsightsEngine.checkDoctorFlag(logs, totalTracked)
+            }
+            var isDoctorCardDismissed by remember {
+                mutableStateOf(
+                    InsightsEngine.isDoctorFlagDismissed(storageHelper.doctorFlagDismissedUntil)
+                )
+            }
+
+            AnimatedVisibility(
+                visible = doctorFlag?.shouldFlag == true && !isDoctorCardDismissed,
+                exit = shrinkVertically() + fadeOut()
+            ) {
+                DoctorFlagSupportCard(
+                    avgCycle = avgCycle,
+                    avgPeriod = avgPeriod,
+                    topSymptoms = topSymptoms.map { it.key to it.value },
+                    lastThreePeriodDates = lastThreePeriodDates,
+                    lang = lang,
+                    onExportSummary = {
+                        val summaryText = InsightsEngine.buildDoctorSummaryText(
+                            avgCycleLength = avgCycle,
+                            avgPeriodDuration = avgPeriod,
+                            topSymptoms = topSymptoms.map { it.key to it.value },
+                            lastThreePeriodDates = lastThreePeriodDates
+                        )
+                        InsightsEngine.shareDoctorSummary(context, summaryText)
+                    },
+                    onDismiss = {
+                        storageHelper.dismissDoctorFlagFor30Days()
+                        isDoctorCardDismissed = true
+                    }
+                )
+            }
+
             // Section 1: Stats Grid (2x2)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -176,16 +240,7 @@ fun InsightsScreen(
                         modifier = Modifier.padding(bottom = 12.dp)
                     )
 
-                    // Aggregate symptoms
-                    val symptomsMap = mutableMapOf<String, Int>()
-                    logs.values.forEach { log ->
-                        log.symptoms.forEach { s ->
-                            symptomsMap[s] = (symptomsMap[s] ?: 0) + 1
-                        }
-                    }
-
                     val totalLogs = logs.size.coerceAtLeast(1)
-                    val topSymptoms = symptomsMap.entries.sortedByDescending { it.value }.take(5)
 
                     if (topSymptoms.isEmpty()) {
                         Text(
@@ -387,6 +442,212 @@ fun StatCard(
     }
 }
 
+@Composable
+private fun DoctorFlagSupportCard(
+    avgCycle: Int,
+    avgPeriod: Int,
+    topSymptoms: List<Pair<String, Int>>,
+    lastThreePeriodDates: List<LocalDate>,
+    lang: String,
+    onExportSummary: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val colors = LocalVelvetColors.current
+    val isDark = colors.background == Color(0xFF0D0D0D)
+
+    val cardContainer = if (isDark) Color(0xFF231D20) else Color(0xFFFFF8F5)
+    val cardBorder = colors.pinkAccent.copy(alpha = if (isDark) 0.45f else 0.3f)
+    val checklistContainer = if (isDark) Color(0xFF171416) else Color(0xFFFFFFFF)
+    val daysUnit = if (lang == "हिंदी") "दिन" else if (lang == "తెలుగు") "రోజులు" else "days"
+
+    val formattedSymptoms = if (topSymptoms.isEmpty()) {
+        Translations.t("doctor_flag_none_logged", lang)
+    } else {
+        topSymptoms.take(4).joinToString(", ") { (sym, _) -> getTranslatedSymptom(sym, lang) }
+    }
+
+    val formattedPeriodDates = if (lastThreePeriodDates.isEmpty()) {
+        Translations.t("doctor_flag_none_logged", lang)
+    } else {
+        lastThreePeriodDates.take(3).joinToString(", ") { Translations.formatDate(it, lang) }
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("doctor_flag_card"),
+        colors = CardDefaults.cardColors(containerColor = cardContainer),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, cardBorder),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Supportive Header Row
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(colors.pinkAccent.copy(alpha = 0.14f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.HealthAndSafety,
+                        contentDescription = Translations.t("doctor_flag_title", lang),
+                        tint = colors.pinkAccent,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Text(
+                    text = Translations.t("doctor_flag_title", lang),
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary,
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            // Supportive, non-alarming body text
+            Text(
+                text = Translations.t("doctor_flag_body", lang),
+                fontSize = 13.sp,
+                lineHeight = 19.sp,
+                color = colors.textSecondary
+            )
+
+            // Auto-generated Appointment Checklist
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("doctor_flag_checklist"),
+                shape = RoundedCornerShape(12.dp),
+                color = checklistContainer,
+                border = BorderStroke(1.dp, colors.border)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Text(
+                        text = Translations.t("doctor_flag_checklist_title", lang),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = colors.pinkAccent
+                    )
+
+                    DoctorChecklistRow(
+                        label = Translations.t("avg_cycle_length", lang),
+                        value = "$avgCycle $daysUnit"
+                    )
+                    DoctorChecklistRow(
+                        label = Translations.t("avg_period_duration", lang),
+                        value = "$avgPeriod $daysUnit"
+                    )
+                    DoctorChecklistRow(
+                        label = Translations.t("doctor_flag_top_symptoms", lang),
+                        value = formattedSymptoms
+                    )
+                    DoctorChecklistRow(
+                        label = Translations.t("doctor_flag_last_3_periods", lang),
+                        value = formattedPeriodDates
+                    )
+                }
+            }
+
+            // Actions: Export Summary + Not Now (dismiss for 30 days)
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = onExportSummary,
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = colors.pinkAccent,
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .testTag("doctor_flag_export_btn")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Share,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = Translations.t("doctor_flag_export_btn", lang),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                TextButton(
+                    onClick = onDismiss,
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 48.dp)
+                        .testTag("doctor_flag_dismiss_btn")
+                ) {
+                    Text(
+                        text = Translations.t("doctor_flag_dismiss_btn", lang),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = colors.textSecondary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DoctorChecklistRow(label: String, value: String) {
+    val colors = LocalVelvetColors.current
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            imageVector = Icons.Default.CheckCircle,
+            contentDescription = null,
+            tint = colors.pinkAccent.copy(alpha = 0.75f),
+            modifier = Modifier
+                .padding(top = 2.dp)
+                .size(15.dp)
+        )
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = label,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
+                color = colors.textSecondary
+            )
+            Text(
+                text = value,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = colors.textPrimary,
+                lineHeight = 18.sp
+            )
+        }
+    }
+}
+
 private fun getTranslatedSymptom(symptom: String, language: String): String {
     return when (symptom.lowercase().trim()) {
         "cramps" -> Translations.t("sym_cramps", language)
@@ -395,10 +656,13 @@ private fun getTranslatedSymptom(symptom: String, language: String): String {
         "acne" -> Translations.t("sym_acne", language)
         "fatigue" -> Translations.t("sym_fatigue", language)
         "mood swings" -> Translations.t("sym_mood_swings", language)
-        "backache" -> Translations.t("sym_backache", language)
+        "backache", "back pain" -> Translations.t("sym_backache", language)
         "breast tenderness" -> Translations.t("sym_breast_tenderness", language)
         "cravings" -> Translations.t("sym_cravings", language)
         "nausea" -> Translations.t("sym_nausea", language)
+        "heavy bleeding" -> Translations.t("sym_heavy_bleeding", language)
+        "severe cramps" -> Translations.t("sym_severe_cramps", language)
+        "severe pain" -> Translations.t("sym_severe_pain", language)
         else -> symptom
     }
 }
