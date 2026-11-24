@@ -194,6 +194,58 @@ object CycleEngine {
         val last = try { LocalDate.parse(lastPeriodStartStr) } catch (e: Exception) { return false }
         return isMissedPeriod(last, cycleLength, today)
     }
+
+    /**
+     * Computes prediction confidence score purely from locally stored cycle lengths.
+     * Never returns a percentage with fewer than 2 valid cycles, and never uses placeholders or random values.
+     */
+    fun getConfidenceScore(cycleHistory: List<Int>?): ConfidenceScoreResult {
+        val validHistory = cycleHistory?.filter { it > 0 } ?: emptyList()
+
+        if (validHistory.size < 2) {
+            return ConfidenceScoreResult(
+                score = null,
+                label = "Building your pattern",
+                labelKey = "confidence_building_label",
+                cyclesNeeded = (3 - validHistory.size).coerceAtLeast(1),
+                cycleCount = validHistory.size
+            )
+        }
+
+        val avg = validHistory.sum().toDouble() / validHistory.size
+        val variance = validHistory.sumOf { len ->
+            val diff = len - avg
+            diff * diff
+        } / validHistory.size
+        val stdDev = kotlin.math.sqrt(variance)
+
+        if (stdDev.isNaN() || stdDev.isInfinite()) {
+            return ConfidenceScoreResult(
+                score = null,
+                label = "Building your pattern",
+                labelKey = "confidence_building_label",
+                cyclesNeeded = 3,
+                cycleCount = 0
+            )
+        }
+
+        val score = kotlin.math.max(50, kotlin.math.min(99, kotlin.math.round(100.0 - (stdDev * 8.0)).toInt()))
+
+        val (label, labelKey) = when {
+            score >= 90 -> "Very accurate" to "confidence_very_accurate"
+            score >= 75 -> "Good accuracy" to "confidence_good_accuracy"
+            score >= 60 -> "Fair accuracy" to "confidence_fair_accuracy"
+            else -> "Low confidence" to "confidence_low_confidence"
+        }
+
+        return ConfidenceScoreResult(
+            score = score,
+            label = label,
+            labelKey = labelKey,
+            cyclesNeeded = 0,
+            cycleCount = validHistory.size
+        )
+    }
 }
 
 data class Anomaly(
@@ -202,3 +254,12 @@ data class Anomaly(
     val message: String,
     val deviationDays: Int = 0
 )
+
+data class ConfidenceScoreResult(
+    val score: Int?,
+    val label: String,
+    val labelKey: String,
+    val cyclesNeeded: Int = 0,
+    val cycleCount: Int = 0
+)
+

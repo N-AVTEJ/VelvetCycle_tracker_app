@@ -186,7 +186,17 @@ object Translations {
             "doctor_flag_last_3_periods" to "Dates of last 3 periods",
             "doctor_flag_export_btn" to "Export this summary",
             "doctor_flag_dismiss_btn" to "Not now",
-            "doctor_flag_none_logged" to "None logged"
+            "doctor_flag_none_logged" to "None logged",
+            "confidence_accurate_badge" to "%d%% accurate",
+            "confidence_building_label" to "Building your pattern",
+            "confidence_building_sub" to "Building your pattern — log %d more cycles for accurate predictions",
+            "confidence_tooltip_title" to "Prediction Confidence",
+            "confidence_tooltip_body" to "Based on your last %d cycles. More logged cycles = better predictions.",
+            "confidence_very_accurate" to "Very accurate",
+            "confidence_good_accuracy" to "Good accuracy",
+            "confidence_fair_accuracy" to "Fair accuracy",
+            "confidence_low_confidence" to "Low confidence",
+            "btn_got_it" to "Got it"
         ),
         "हिंदी" to mapOf(
             "app_name" to "वेलवेट साइकिल",
@@ -367,7 +377,17 @@ object Translations {
             "doctor_flag_last_3_periods" to "पिछले 3 मासिक धर्म की तिथियां",
             "doctor_flag_export_btn" to "यह सारांश साझा करें",
             "doctor_flag_dismiss_btn" to "अभी नहीं",
-            "doctor_flag_none_logged" to "कोई दर्ज नहीं"
+            "doctor_flag_none_logged" to "कोई दर्ज नहीं",
+            "confidence_accurate_badge" to "%d%% सटीक",
+            "confidence_building_label" to "आपका पैटर्न बन रहा है",
+            "confidence_building_sub" to "आपका पैटर्न बन रहा है — सटीक अनुमान के लिए %d और चक्र दर्ज करें",
+            "confidence_tooltip_title" to "अनुमान की सटीकता",
+            "confidence_tooltip_body" to "आपके पिछले %d चक्रों पर आधारित। अधिक दर्ज चक्र = बेहतर अनुमान।",
+            "confidence_very_accurate" to "बहुत सटीक",
+            "confidence_good_accuracy" to "अच्छी सटीकता",
+            "confidence_fair_accuracy" to "उचित सटीकता",
+            "confidence_low_confidence" to "कम सटीकता",
+            "btn_got_it" to "समझ गया"
         ),
         "తెలుగు" to mapOf(
             "app_name" to "వెల్వెట్ సైకిల్",
@@ -548,7 +568,17 @@ object Translations {
             "doctor_flag_last_3_periods" to "చివరి 3 పీరియడ్ తేదీలు",
             "doctor_flag_export_btn" to "ఈ సారాంశాన్ని షేర్ చేయండి",
             "doctor_flag_dismiss_btn" to "ఇప్పుడు కాదు",
-            "doctor_flag_none_logged" to "ఏవీ నమోదు కాలేదు"
+            "doctor_flag_none_logged" to "ఏవీ నమోదు కాలేదు",
+            "confidence_accurate_badge" to "%d%% ఖచ్చితత్వం",
+            "confidence_building_label" to "మీ ప్యాటర్న్ రూపొందుతోంది",
+            "confidence_building_sub" to "మీ ప్యాటర్న్ రూపొందుతోంది — ఖచ్చితమైన అంచనాల కోసం మరో %d చక్రాలు నమోదు చేయండి",
+            "confidence_tooltip_title" to "అంచనా ఖచ్చితత్వం",
+            "confidence_tooltip_body" to "మీ చివరి %d చక్రాల ఆధారంగా. ఎక్కువ చక్రాలు నమోదు చేస్తే = మెరుగైన అంచనాలు.",
+            "confidence_very_accurate" to "చాలా ఖచ్చితమైనది",
+            "confidence_good_accuracy" to "మంచి ఖచ్చితత్వం",
+            "confidence_fair_accuracy" to "సరైన ఖచ్చితత్వం",
+            "confidence_low_confidence" to "తక్కువ ఖచ్చితత్వం",
+            "btn_got_it" to "అర్థమైంది"
         )
     )
 

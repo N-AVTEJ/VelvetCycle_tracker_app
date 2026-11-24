@@ -220,4 +220,56 @@ class CycleEngineTest {
         val lastStart36 = today.minusDays(36)
         assertTrue(CycleEngine.isMissedPeriod(lastStart36, cycleLength, today))
     }
+
+    @Test
+    fun getConfidenceScore_returnsBuildingPattern_whenFewerThan2ValidCycles() {
+        // Null or empty
+        val nullResult = CycleEngine.getConfidenceScore(null)
+        assertNull(nullResult.score)
+        assertEquals("Building your pattern", nullResult.label)
+        assertEquals(3, nullResult.cyclesNeeded)
+
+        val emptyResult = CycleEngine.getConfidenceScore(emptyList())
+        assertNull(emptyResult.score)
+        assertEquals("Building your pattern", emptyResult.label)
+        assertEquals(3, emptyResult.cyclesNeeded)
+
+        // Single cycle
+        val oneCycle = CycleEngine.getConfidenceScore(listOf(28))
+        assertNull(oneCycle.score)
+        assertEquals("Building your pattern", oneCycle.label)
+        assertEquals(2, oneCycle.cyclesNeeded)
+
+        // Malformed negative/zero entries discarded -> only 1 valid cycle left
+        val malformed = CycleEngine.getConfidenceScore(listOf(-10, 0, 28, -1))
+        assertNull(malformed.score)
+        assertEquals("Building your pattern", malformed.label)
+        assertEquals(2, malformed.cyclesNeeded)
+    }
+
+    @Test
+    fun getConfidenceScore_calculatesExactStatsAndClampsTo50_99() {
+        // Perfectly regular cycles (stdDev = 0) -> 100 clamped to 99 ("Very accurate")
+        val regular = CycleEngine.getConfidenceScore(listOf(28, 28, 28))
+        assertEquals(99, regular.score)
+        assertEquals("Very accurate", regular.label)
+        assertEquals(3, regular.cycleCount)
+
+        // Moderate variation: [26, 30] -> avg=28, variance=4, stdDev=2 -> 100 - 16 = 84 ("Good accuracy")
+        val moderate = CycleEngine.getConfidenceScore(listOf(26, 30))
+        assertEquals(84, moderate.score)
+        assertEquals("Good accuracy", moderate.label)
+        assertEquals(2, moderate.cycleCount)
+
+        // Fair variation: [24, 32] -> avg=28, variance=16, stdDev=4 -> 100 - 32 = 68 ("Fair accuracy")
+        val fair = CycleEngine.getConfidenceScore(listOf(24, 32))
+        assertEquals(68, fair.score)
+        assertEquals("Fair accuracy", fair.label)
+
+        // High variation: [20, 40] -> avg=30, variance=100, stdDev=10 -> 100 - 80 = 20 clamped to 50 ("Low confidence")
+        val irregular = CycleEngine.getConfidenceScore(listOf(20, 40))
+        assertEquals(50, irregular.score)
+        assertEquals("Low confidence", irregular.label)
+    }
 }
+

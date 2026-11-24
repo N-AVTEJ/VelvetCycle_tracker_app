@@ -21,7 +21,10 @@ import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -65,8 +68,8 @@ fun HomeScreen(
     val daysUntilNextPeriod = CycleEngine.getDaysUntilNextPeriod(lastPeriodStart, cycleLength, today)
     val isDayBefore = CycleEngine.isDayBeforePeriod(lastPeriodStart, cycleLength, today)
 
-    // Phase 19: Anomaly detection and Missed Period calculation (local-only, encrypted SecureStore)
-    val cycleRecords = remember { storageHelper.getCycleHistory() }
+    // Phase 19 & 21: Anomaly detection, Missed Period, and Cycle Confidence Score (purely local, encrypted SecureStore)
+    val cycleRecords = remember(lastPeriodStart, cycleLength) { storageHelper.getCycleHistory() }
     val cycleHistory = remember(cycleRecords) {
         cycleRecords.take(6).map { it.duration }.filter { it > 0 }
     }
@@ -76,6 +79,10 @@ fun HomeScreen(
     val isMissed = remember(lastPeriodStart, cycleLength, today) {
         CycleEngine.isMissedPeriod(lastPeriodStart, cycleLength, today)
     }
+    val confidence = remember(cycleHistory) {
+        CycleEngine.getConfidenceScore(cycleHistory)
+    }
+    var showConfidenceDialog by remember { mutableStateOf(false) }
 
     // Fertile Window Calculations
     val daysBetween = java.time.temporal.ChronoUnit.DAYS.between(lastPeriodStart, today)
@@ -375,21 +382,59 @@ fun HomeScreen(
                     .padding(20.dp)
             ) {
                 Row(
+                    modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.WaterDrop,
-                        contentDescription = cycleStatusTitle,
-                        tint = colors.pinkAccent,
-                        modifier = Modifier.size(24.dp)
-                    )
-                    Text(
-                        text = cycleStatusTitle,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = colors.pinkAccent
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.WaterDrop,
+                            contentDescription = cycleStatusTitle,
+                            tint = colors.pinkAccent,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Text(
+                            text = cycleStatusTitle,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.pinkAccent
+                        )
+                    }
+
+                    // Phase 21: Confidence Score Pill Badge (shown only when >= 2 cycles logged)
+                    confidence.score?.let { scoreValue ->
+                        Surface(
+                            onClick = { showConfidenceDialog = true },
+                            shape = RoundedCornerShape(50),
+                            color = colors.pinkAccent.copy(alpha = 0.08f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, colors.pinkAccent),
+                            modifier = Modifier
+                                .minimumInteractiveComponentSize()
+                                .testTag("confidence_score_badge")
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Text(
+                                    text = Translations.t("confidence_accurate_badge", lang, scoreValue),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = colors.pinkAccent
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.Info,
+                                    contentDescription = Translations.t("confidence_tooltip_title", lang),
+                                    tint = colors.pinkAccent,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -425,7 +470,93 @@ fun HomeScreen(
                     color = colors.textSecondary,
                     lineHeight = 18.sp
                 )
+
+                // Phase 21: Building pattern note when fewer than 2 cycles are logged
+                if (confidence.score == null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Surface(
+                        shape = RoundedCornerShape(10.dp),
+                        color = colors.pinkAccent.copy(alpha = 0.06f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, colors.pinkAccent.copy(alpha = 0.3f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("confidence_building_badge")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Info,
+                                contentDescription = Translations.t("confidence_building_label", lang),
+                                tint = colors.pinkAccent,
+                                modifier = Modifier.size(16.dp)
+                            )
+                            Text(
+                                text = Translations.t("confidence_building_sub", lang, confidence.cyclesNeeded),
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = colors.textSecondary,
+                                lineHeight = 16.sp
+                            )
+                        }
+                    }
+                }
             }
+        }
+
+        if (showConfidenceDialog && confidence.score != null) {
+            AlertDialog(
+                onDismissRequest = { showConfidenceDialog = false },
+                containerColor = colors.cardBackground,
+                titleContentColor = colors.textPrimary,
+                textContentColor = colors.textSecondary,
+                modifier = Modifier.testTag("confidence_tooltip_dialog"),
+                title = {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text(
+                            text = Translations.t("confidence_tooltip_title", lang),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textPrimary
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(50),
+                            color = colors.pinkAccent.copy(alpha = 0.1f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, colors.pinkAccent.copy(alpha = 0.4f))
+                        ) {
+                            Text(
+                                text = "${Translations.t("confidence_accurate_badge", lang, confidence.score)} · ${Translations.t(confidence.labelKey, lang)}",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = colors.pinkAccent,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                },
+                text = {
+                    Text(
+                        text = Translations.t("confidence_tooltip_body", lang, confidence.cycleCount),
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        color = colors.textSecondary
+                    )
+                },
+                confirmButton = {
+                    TextButton(
+                        onClick = { showConfidenceDialog = false },
+                        modifier = Modifier.testTag("confidence_tooltip_close_btn")
+                    ) {
+                        Text(
+                            text = Translations.t("btn_got_it", lang),
+                            fontWeight = FontWeight.Bold,
+                            color = colors.pinkAccent
+                        )
+                    }
+                }
+            )
         }
 
         // --- Card 2: Next period prediction ---
