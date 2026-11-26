@@ -160,6 +160,58 @@ class StorageHelper(private val context: Context) {
         regularPrefs.edit().remove("backgrounded_at").commit()
     }
 
+    // --- NON-SENSITIVE PARTNER SHARE-A-DAY PREFERENCES ---
+
+    var showShareButtonOnHome: Boolean
+        get() = regularPrefs.getBoolean("show_share_button_home", true)
+        set(value) { regularPrefs.edit().putBoolean("show_share_button_home", value).commit() }
+
+    /**
+     * Reads user-authored custom partner share messages per phase from AsyncStorage-equivalent SharedPreferences.
+     * Never logs custom text content.
+     */
+    fun getCustomShareMessages(): Map<String, String> {
+        val raw = regularPrefs.getString("custom_share_messages", null) ?: return emptyMap()
+        return try {
+            val json = org.json.JSONObject(raw)
+            val result = mutableMapOf<String, String>()
+            val keys = json.keys()
+            while (keys.hasNext()) {
+                val key = keys.next()
+                val value = json.optString(key, "")
+                if (value.isNotBlank()) {
+                    result[key] = value
+                }
+            }
+            result
+        } catch (_: Exception) {
+            emptyMap()
+        }
+    }
+
+    fun getCustomShareMessage(phase: String): String? {
+        val normalized = ShareMessages.normalizePhase(phase)
+        return getCustomShareMessages()[normalized]
+    }
+
+    /**
+     * Saves or removes a custom partner share message for a given phase under 'custom_share_messages'.
+     * Passing blank text removes the override so the default phase template is restored.
+     */
+    fun saveCustomShareMessage(phase: String, message: String) {
+        val normalized = ShareMessages.normalizePhase(phase)
+        val current = getCustomShareMessages().toMutableMap()
+        val trimmed = message.trim()
+        if (trimmed.isEmpty()) {
+            current.remove(normalized)
+        } else {
+            current[normalized] = trimmed
+        }
+        val json = org.json.JSONObject()
+        current.forEach { (k, v) -> json.put(k, v) }
+        regularPrefs.edit().putString("custom_share_messages", json.toString()).commit()
+    }
+
     // --- NON-SENSITIVE NOTIFICATION SETTINGS ---
 
     var periodReminderEnabled: Boolean

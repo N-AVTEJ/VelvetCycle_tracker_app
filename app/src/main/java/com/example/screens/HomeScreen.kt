@@ -1,15 +1,20 @@
 package com.example.screens
 
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Favorite
@@ -28,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -39,6 +45,7 @@ import com.example.constants.Translations
 import com.example.ui.theme.LocalVelvetColors
 import com.example.ui.theme.Teal
 import com.example.utils.CycleEngine
+import com.example.utils.ShareMessages
 import com.example.utils.StorageHelper
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -83,6 +90,16 @@ fun HomeScreen(
         CycleEngine.getConfidenceScore(cycleHistory)
     }
     var showConfidenceDialog by remember { mutableStateOf(false) }
+
+    // Phase 22: Partner Share-a-Day state
+    val context = LocalContext.current
+    val showShareButton = storageHelper.showShareButtonOnHome
+    var customShareMessages by remember { mutableStateOf(storageHelper.getCustomShareMessages()) }
+    var showSharePreviewDialog by remember { mutableStateOf(false) }
+    var shareDraftText by remember { mutableStateOf("") }
+    var showShareErrorDialog by remember { mutableStateOf(false) }
+    var showFavoriteMessageDialog by remember { mutableStateOf(false) }
+    var favoriteDraftText by remember { mutableStateOf("") }
 
     // Fertile Window Calculations
     val daysBetween = java.time.temporal.ChronoUnit.DAYS.between(lastPeriodStart, today)
@@ -889,8 +906,302 @@ fun HomeScreen(
                     color = colors.textSecondary,
                     lineHeight = 18.sp
                 )
+
+                // Phase 22: Partner Share-a-Day button — completely removed from UI tree when disabled in Settings
+                if (showShareButton) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = colors.border, thickness = 0.5.dp)
+                    Spacer(modifier = Modifier.height(14.dp))
+
+                    PartnerShareButton(
+                        label = Translations.t("share_with_partner_btn", lang),
+                        hint = Translations.t("share_with_partner_hint", lang),
+                        onClick = {
+                            shareDraftText = ShareMessages.getMessageForPhase(
+                                phase = currentPhase,
+                                language = lang,
+                                customMessages = customShareMessages
+                            )
+                            showSharePreviewDialog = true
+                        },
+                        onLongClick = {
+                            favoriteDraftText = ShareMessages.getMessageForPhase(
+                                phase = currentPhase,
+                                language = lang,
+                                customMessages = customShareMessages
+                            )
+                            showFavoriteMessageDialog = true
+                        }
+                    )
+                }
             }
         }
         }
+
+        // Phase 22: Editable Share Preview Modal (explicit 'Send' tap required)
+        if (showSharePreviewDialog) {
+            AlertDialog(
+                onDismissRequest = { showSharePreviewDialog = false },
+                containerColor = colors.cardBackground,
+                titleContentColor = colors.textPrimary,
+                textContentColor = colors.textSecondary,
+                modifier = Modifier.testTag("share_partner_preview_dialog"),
+                title = {
+                    Text(
+                        text = Translations.t("share_preview_title", lang),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = Translations.t("share_preview_subtitle", lang),
+                            fontSize = 12.sp,
+                            color = colors.textSecondary,
+                            lineHeight = 17.sp
+                        )
+                        OutlinedTextField(
+                            value = shareDraftText,
+                            onValueChange = { shareDraftText = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 110.dp)
+                                .testTag("share_partner_message_input"),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = colors.pinkAccent,
+                                unfocusedBorderColor = colors.border,
+                                focusedTextColor = colors.textPrimary,
+                                unfocusedTextColor = colors.textPrimary
+                            )
+                        )
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            val trimmed = shareDraftText.trim()
+                            showSharePreviewDialog = false
+                            val shared = ShareMessages.sharePhaseMessage(context, trimmed)
+                            if (!shared) {
+                                showShareErrorDialog = true
+                            }
+                        },
+                        enabled = shareDraftText.isNotBlank(),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.pinkAccent),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("share_partner_send_btn")
+                    ) {
+                        Text(
+                            text = Translations.t("share_send_btn", lang),
+                            fontWeight = FontWeight.Bold,
+                            color = androidx.compose.ui.graphics.Color.White
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showSharePreviewDialog = false },
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("share_partner_cancel_btn")
+                    ) {
+                        Text(
+                            text = Translations.t("share_cancel_btn", lang),
+                            color = colors.textSecondary
+                        )
+                    }
+                }
+            )
+        }
+
+        // Phase 22: Long-Press Favorite Partner Message Modal
+        if (showFavoriteMessageDialog) {
+            AlertDialog(
+                onDismissRequest = { showFavoriteMessageDialog = false },
+                containerColor = colors.cardBackground,
+                titleContentColor = colors.textPrimary,
+                textContentColor = colors.textSecondary,
+                modifier = Modifier.testTag("favorite_share_dialog"),
+                title = {
+                    Text(
+                        text = Translations.t("favorite_message_title", lang),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary
+                    )
+                },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = Translations.t("favorite_message_subtitle", lang),
+                            fontSize = 12.sp,
+                            color = colors.textSecondary,
+                            lineHeight = 17.sp
+                        )
+                        OutlinedTextField(
+                            value = favoriteDraftText,
+                            onValueChange = { favoriteDraftText = it },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = 110.dp)
+                                .testTag("favorite_share_message_input"),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = colors.pinkAccent,
+                                unfocusedBorderColor = colors.border,
+                                focusedTextColor = colors.textPrimary,
+                                unfocusedTextColor = colors.textPrimary
+                            )
+                        )
+                        TextButton(
+                            onClick = {
+                                storageHelper.saveCustomShareMessage(currentPhase, "")
+                                customShareMessages = storageHelper.getCustomShareMessages()
+                                favoriteDraftText = ShareMessages.getDefaultTemplate(currentPhase, lang)
+                                Toast.makeText(
+                                    context,
+                                    Translations.t("favorite_message_reset_toast", lang),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            },
+                            modifier = Modifier.testTag("favorite_share_reset_btn")
+                        ) {
+                            Text(
+                                text = Translations.t("favorite_message_reset_btn", lang),
+                                fontSize = 12.sp,
+                                color = colors.pinkAccent
+                            )
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            storageHelper.saveCustomShareMessage(currentPhase, favoriteDraftText)
+                            customShareMessages = storageHelper.getCustomShareMessages()
+                            showFavoriteMessageDialog = false
+                            Toast.makeText(
+                                context,
+                                Translations.t("favorite_message_saved_toast", lang),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        enabled = favoriteDraftText.isNotBlank(),
+                        colors = ButtonDefaults.buttonColors(containerColor = colors.pinkAccent),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier
+                            .heightIn(min = 48.dp)
+                            .testTag("favorite_share_save_btn")
+                    ) {
+                        Text(
+                            text = Translations.t("favorite_message_save_btn", lang),
+                            fontWeight = FontWeight.Bold,
+                            color = androidx.compose.ui.graphics.Color.White
+                        )
+                    }
+                },
+                dismissButton = {
+                    TextButton(
+                        onClick = { showFavoriteMessageDialog = false },
+                        modifier = Modifier.heightIn(min = 48.dp)
+                    ) {
+                        Text(
+                            text = Translations.t("share_cancel_btn", lang),
+                            color = colors.textSecondary
+                        )
+                    }
+                }
+            )
+        }
+
+        // Phase 22: Share Error Dialog
+        if (showShareErrorDialog) {
+            AlertDialog(
+                onDismissRequest = { showShareErrorDialog = false },
+                containerColor = colors.cardBackground,
+                title = {
+                    Text(
+                        text = Translations.t("share_error_title", lang),
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary
+                    )
+                },
+                text = {
+                    Text(
+                        text = Translations.t("share_error_body", lang),
+                        color = colors.textSecondary
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { showShareErrorDialog = false }) {
+                        Text(
+                            text = Translations.t("btn_got_it", lang),
+                            fontWeight = FontWeight.Bold,
+                            color = colors.pinkAccent
+                        )
+                    }
+                }
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun PartnerShareButton(
+    label: String,
+    hint: String,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
+    val colors = LocalVelvetColors.current
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 48.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(colors.pinkAccent.copy(alpha = 0.08f))
+                .border(1.dp, colors.pinkAccent, RoundedCornerShape(12.dp))
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = onLongClick
+                )
+                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .testTag("share_with_partner_button"),
+            contentAlignment = Alignment.Center
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Share,
+                    contentDescription = label,
+                    tint = colors.pinkAccent,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = label,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.pinkAccent
+                )
+            }
+        }
+        Text(
+            text = hint,
+            fontSize = 11.sp,
+            color = colors.textSecondary
+        )
     }
 }

@@ -79,6 +79,7 @@ fun SettingsScreen(
     var selectedStore by remember { mutableStateOf(storageHelper.padStore) }
     var selectedLanguage by remember { mutableStateOf(storageHelper.appLanguage) }
     var isDarkModeTheme by remember { mutableStateOf(storageHelper.isDarkMode) }
+    var showShareButton by remember { mutableStateOf(storageHelper.showShareButtonOnHome) }
 
     // Backup & Restore Simulation States
     var showBackupDialog by remember { mutableStateOf(false) }
@@ -959,6 +960,43 @@ fun SettingsScreen(
                                 uncheckedTrackColor = colors.border
                             ),
                             modifier = Modifier.testTag("dark_mode_toggle")
+                        )
+                    }
+
+                    HorizontalDivider(color = colors.border, thickness = 0.5.dp)
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = Translations.t("settings_show_share_title", lang),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.textPrimary,
+                                modifier = Modifier.testTag("settings_show_share_title")
+                            )
+                            Text(
+                                text = Translations.t("settings_show_share_subtitle", lang),
+                                fontSize = 11.sp,
+                                color = colors.textSecondary
+                            )
+                        }
+                        Switch(
+                            checked = showShareButton,
+                            onCheckedChange = { checked ->
+                                showShareButton = checked
+                                storageHelper.showShareButtonOnHome = checked
+                            },
+                            colors = SwitchDefaults.colors(
+                                checkedThumbColor = colors.cardBackground,
+                                checkedTrackColor = colors.pinkAccent,
+                                uncheckedThumbColor = colors.textSecondary,
+                                uncheckedTrackColor = colors.border
+                            ),
+                            modifier = Modifier.testTag("settings_show_share_switch")
                         )
                     }
                 }
