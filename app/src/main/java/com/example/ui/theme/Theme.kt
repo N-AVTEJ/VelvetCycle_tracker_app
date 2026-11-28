@@ -20,7 +20,13 @@ data class VelvetColors(
     val textSecondary: Color,
     val pinkAccent: Color,
     val border: Color,
-    val tabBackground: Color
+    val tabBackground: Color,
+    val isDark: Boolean = false,
+    val comfortBgStart: Color = Color(0xFFFFE6F0),
+    val comfortBgEnd: Color = Color(0xFFFAD3E2),
+    val comfortCardBackground: Color = Color(0xFFFFF8FA),
+    val comfortBorder: Color = Color(0xFFF0B7CB),
+    val comfortPillBackground: Color = Color(0xFFFCE6EF)
 )
 
 val LightVelvetColors = VelvetColors(
@@ -30,7 +36,13 @@ val LightVelvetColors = VelvetColors(
     textSecondary = Color(0xFF757575),   // GrayText
     pinkAccent = Color(0xFFD4537E),      // PrimaryPink
     border = Color(0xFFE0E0E0),          // BorderColor
-    tabBackground = Color(0xFFFFFFFF)    // White
+    tabBackground = Color(0xFFFFFFFF),   // White
+    isDark = false,
+    comfortBgStart = Color(0xFFFFE6F0),
+    comfortBgEnd = Color(0xFFF8D0E0),
+    comfortCardBackground = Color(0xFFFFF8FA),
+    comfortBorder = Color(0xFFEEB5C9),
+    comfortPillBackground = Color(0xFFFBE6EF)
 )
 
 val DarkVelvetColors = VelvetColors(
@@ -40,7 +52,13 @@ val DarkVelvetColors = VelvetColors(
     textSecondary = Color(0xFFAAAAAA),
     pinkAccent = Color(0xFFD4537E),
     border = Color(0xFF2A2A2A),
-    tabBackground = Color(0xFF111111)
+    tabBackground = Color(0xFF111111),
+    isDark = true,
+    comfortBgStart = Color(0xFF3A2430),  // Warm muted pink for dark mode comfort background
+    comfortBgEnd = Color(0xFF2C1B24),
+    comfortCardBackground = Color(0xFF492E3D),
+    comfortBorder = Color(0xFF6B4358),
+    comfortPillBackground = Color(0xFF563647)
 )
 
 val LocalVelvetColors = staticCompositionLocalOf { LightVelvetColors }

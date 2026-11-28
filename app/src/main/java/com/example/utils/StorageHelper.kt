@@ -212,6 +212,24 @@ class StorageHelper(private val context: Context) {
         regularPrefs.edit().putString("custom_share_messages", json.toString()).commit()
     }
 
+    // --- NON-SENSITIVE COMFORT MODE UI PREFERENCE (Resets daily & when period ends) ---
+
+    fun getComfortModeActive(eligible: Boolean, today: LocalDate = LocalDate.now()): Boolean {
+        if (!eligible) {
+            if (regularPrefs.contains(ComfortModeHelper.PREF_KEY_COMFORT_MODE_ACTIVE)) {
+                regularPrefs.edit().remove(ComfortModeHelper.PREF_KEY_COMFORT_MODE_ACTIVE).commit()
+            }
+            return false
+        }
+        val raw = regularPrefs.getString(ComfortModeHelper.PREF_KEY_COMFORT_MODE_ACTIVE, null)
+        return ComfortModeHelper.resolveActiveState(eligible = true, savedRaw = raw, today = today)
+    }
+
+    fun setComfortModeActive(active: Boolean, today: LocalDate = LocalDate.now()) {
+        val encoded = ComfortModeHelper.encodePreference(active = active, date = today)
+        regularPrefs.edit().putString(ComfortModeHelper.PREF_KEY_COMFORT_MODE_ACTIVE, encoded).commit()
+    }
+
     // --- NON-SENSITIVE NOTIFICATION SETTINGS ---
 
     var periodReminderEnabled: Boolean

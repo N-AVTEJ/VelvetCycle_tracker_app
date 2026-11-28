@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.testTag
@@ -45,6 +46,7 @@ import com.example.LocalAppLanguage
 import com.example.constants.Translations
 import com.example.ui.theme.LocalVelvetColors
 import com.example.ui.theme.Teal
+import com.example.utils.ComfortModeHelper
 import com.example.utils.CycleEngine
 import com.example.utils.ShareMessages
 import com.example.utils.StorageHelper
@@ -105,6 +107,16 @@ fun HomeScreen(
     var showShareErrorDialog by remember { mutableStateOf(false) }
     var showFavoriteMessageDialog by remember { mutableStateOf(false) }
     var favoriteDraftText by remember { mutableStateOf("") }
+
+    // Phase 23: Comfort Mode auto-detection (day before period OR menstruation phase)
+    // Persists daily preference under 'comfort_mode_active' and auto-resets when period ends
+    val isComfortEligible = ComfortModeHelper.isEligibleForComfortMode(isDayBefore, currentPhase)
+    var isComfortModeOn by remember(isComfortEligible, today) {
+        mutableStateOf(storageHelper.getComfortModeActive(isComfortEligible, today))
+    }
+    LaunchedEffect(isComfortEligible, today) {
+        isComfortModeOn = storageHelper.getComfortModeActive(isComfortEligible, today)
+    }
 
     // Fertile Window Calculations
     val daysBetween = java.time.temporal.ChronoUnit.DAYS.between(lastPeriodStart, today)
@@ -185,39 +197,70 @@ fun HomeScreen(
         else -> if (lang == "हिंदी") "यांग योग, आसान पिलेट्स, तैरना, मध्यम स्ट्रेचिंग" else if (lang == "తెలుగు") "యోగ, తేలికపాటి పైలేట్స్, ఈత కొట్టడం, స్ట్రెచింగ్" else "Yin yoga, easy pilates, swimming, moderate stretching"
     }
 
-    Column(
-        modifier = Modifier
+    val screenModifier = if (isComfortModeOn) {
+        Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(colors.comfortBgStart, colors.comfortBgEnd)
+                )
+            )
+            .verticalScroll(rememberScrollState())
+            .padding(24.dp)
+    } else {
+        Modifier
             .fillMaxSize()
             .background(colors.background)
             .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .padding(16.dp)
+    }
+
+    Column(
+        modifier = screenModifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(if (isComfortModeOn) 24.dp else 16.dp)
     ) {
         // --- Header Section ---
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 12.dp),
+                .padding(vertical = if (isComfortModeOn) 8.dp else 12.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column {
                 Text(
                     text = greetingLabel,
-                    fontSize = 24.sp,
+                    fontSize = if (isComfortModeOn) 26.sp else 24.sp,
                     fontWeight = FontWeight.Bold,
                     color = colors.textPrimary
                 )
                 Text(
                     text = dateText,
-                    fontSize = 14.sp,
+                    fontSize = if (isComfortModeOn) 16.sp else 14.sp,
                     color = colors.textSecondary
                 )
             }
         }
 
-        if (isDayBefore) {
+        // Phase 23: Comfort Mode Toggle (auto-shown on day before period or menstruation days)
+        if (isComfortEligible) {
+            ComfortModeToggleBar(
+                isComfortModeOn = isComfortModeOn,
+                onToggle = { enabled ->
+                    isComfortModeOn = enabled
+                    storageHelper.setComfortModeActive(enabled, today)
+                }
+            )
+        }
+
+        if (isComfortModeOn) {
+            // Simplified cozy Comfort Mode layout — hides secondary cards
+            ComfortModeView(
+                storageHelper = storageHelper,
+                today = today
+            )
+        } else if (isDayBefore) {
             // Special Day Before Period state: Replaces all normal cards with the 5 special cards
             DayBeforePeriodSpecialView()
             if (showShareButton) {
