@@ -26,6 +26,7 @@ import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material.icons.outlined.WbSunny
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -93,8 +94,12 @@ fun HomeScreen(
 
     // Phase 22: Partner Share-a-Day state
     val context = LocalContext.current
-    val showShareButton = storageHelper.showShareButtonOnHome
+    var showShareButton by remember { mutableStateOf(storageHelper.showShareButtonOnHome) }
     var customShareMessages by remember { mutableStateOf(storageHelper.getCustomShareMessages()) }
+    LaunchedEffect(Unit) {
+        showShareButton = storageHelper.showShareButtonOnHome
+        customShareMessages = storageHelper.getCustomShareMessages()
+    }
     var showSharePreviewDialog by remember { mutableStateOf(false) }
     var shareDraftText by remember { mutableStateOf("") }
     var showShareErrorDialog by remember { mutableStateOf(false) }
@@ -215,6 +220,37 @@ fun HomeScreen(
         if (isDayBefore) {
             // Special Day Before Period state: Replaces all normal cards with the 5 special cards
             DayBeforePeriodSpecialView()
+            if (showShareButton) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = colors.cardBackground),
+                    shape = RoundedCornerShape(18.dp),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Box(modifier = Modifier.padding(20.dp)) {
+                        PartnerShareButton(
+                            label = Translations.t("share_with_partner_btn", lang),
+                            hint = Translations.t("share_with_partner_hint", lang),
+                            onClick = {
+                                shareDraftText = ShareMessages.getMessageForPhase(
+                                    phase = currentPhase,
+                                    language = lang,
+                                    customMessages = customShareMessages
+                                )
+                                showSharePreviewDialog = true
+                            },
+                            onLongClick = {
+                                favoriteDraftText = ShareMessages.getMessageForPhase(
+                                    phase = currentPhase,
+                                    language = lang,
+                                    customMessages = customShareMessages
+                                )
+                                showFavoriteMessageDialog = true
+                            }
+                        )
+                    }
+                }
+            }
         } else {
             // --- Normal cards displayed on all other days ---
 
